@@ -112,14 +112,14 @@ function passageForm(target, value = '') {
 function viewHome(main) {
   main.append(
     h('h1', {}, 'KJV reading site'),
-    h('p', {}, 'Record one verse at a time, save each verse to Google Drive, and join a passage with StitchBot.'),
-    h('h2', {}, 'Record'), passageForm('record'),
-    h('h2', {}, 'Stitch'), passageForm('stitch'),
-    h('h2', {}, 'Verse text'),
-    h('p', { class: 'text-status' }, textStatusLine()), textActions(),
-    h('h2', {}, 'Older pages (still live)'),
+    h('p', { class: 'lead' }, 'Record one verse at a time, save each verse to Google Drive, and join a passage with StitchBot.'),
+    h('section', { class: 'card' }, h('h2', {}, 'Record'), passageForm('record')),
+    h('section', { class: 'card' }, h('h2', {}, 'Stitch'), passageForm('stitch')),
+    h('section', { class: 'card' }, h('h2', {}, 'Verse text'),
+      h('p', { class: 'text-status' }, textStatusLine()), textActions()),
+    h('section', { class: 'older' }, h('h2', {}, 'Older pages (still live)'),
     h('ul', {}, ...Object.entries({ 'Reading Tracker': OLD.tracker, 'Voice Recorder (old)': OLD.recorder, 'Rolling Reader': OLD.reader, 'Cross-references': OLD.xref, 'Concordance of Even': OLD.concordance })
-      .map(([k, v]) => h('li', {}, h('a', { href: v, target: '_blank', rel: 'noopener' }, k)))),
+      .map(([k, v]) => h('li', {}, h('a', { href: v, target: '_blank', rel: 'noopener' }, k))))),
   );
 }
 
@@ -127,11 +127,11 @@ async function viewDrive(main) {
   const ups = (await store.allUploads()).sort((a, b) => b.updatedAt - a.updatedAt);
   const btn = h('button', { onclick: async () => { try { await auth.signIn(); await queue.resumeAfterSignIn(); render(); } catch (e) { alert(e.message); } } }, auth.isSignedIn() ? 'Sign in again' : 'Sign in with Google');
   main.append(h('h1', {}, 'Google Drive'),
-    h('p', {}, 'Recordings are saved to "KJV Recordings" in your Drive. This site can only see files it saved itself (drive.file permission). Replaced takes are moved to a "_replaced" folder, never deleted.'),
+    h('p', { class: 'lead' }, 'Recordings are saved to "KJV Recordings" in your Drive. This site can only see files it saved itself (drive.file permission). Replaced takes are moved to a "_replaced" folder, never deleted.'),
     h('div', { class: 'row' }, btn, auth.isSignedIn() ? h('button', { onclick: () => { auth.signOut(); render(); } }, 'Sign out') : null,
       h('button', { onclick: async () => { for (const u of await store.allUploads()) if (u.state === U.UPLOAD_FAILED) await store.putUpload({ ...u, nextAt: 0 }); queue.kick(); } }, 'Retry failed uploads')),
-    h('table', {}, h('tr', {}, h('th', {}, 'Verse'), h('th', {}, 'Take'), h('th', {}, 'Upload'), h('th', {}, 'Note')),
-      ...ups.map(u => h('tr', {}, h('td', {}, refOf(u.verseId)), h('td', {}, u.takeNo), h('td', { class: 'st-' + u.state }, u.state), h('td', {}, u.error || '')))));
+    h('div', { class: 'table-wrap' }, h('table', {}, h('tr', {}, h('th', {}, 'Verse'), h('th', {}, 'Take'), h('th', {}, 'Upload'), h('th', {}, 'Note')),
+      ...ups.map(u => h('tr', {}, h('td', {}, refOf(u.verseId)), h('td', {}, u.takeNo), h('td', { class: 'st-' + u.state }, u.state), h('td', {}, u.error || ''))))));
 }
 
 // ---------- Recorder view ----------
@@ -143,7 +143,7 @@ async function viewRecord(main, passage) {
   const rec = recorder;
   const title = h('h1', {}), verseRef = h('div', { class: 'ref' }), verseText = h('div', { class: 'verse' }), status = h('div', { class: 'status' });
   const msg = h('div', { class: 'msg' }), controls = h('div', { class: 'row big' }), reviewBox = h('div', {}), list = h('ol', { class: 'verses' });
-  main.append(title, verseRef, verseText, text.loaded ? h('div', {}) : textActions(), status, msg, controls, reviewBox, h('h2', {}, 'Verses'), list,
+  main.append(title, h('section', { class: 'card reading' }, verseRef, verseText, text.loaded ? h('div', {}) : textActions()), h('section', { class: 'card controls' }, status, msg, controls, reviewBox), h('h2', {}, 'Verses'), list,
     h('p', {}, h('a', { href: `#/stitch?passage=${encodeURIComponent(rec.passage)}` }, 'Go to StitchBot for this passage')));
 
   async function paint() {

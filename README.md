@@ -86,3 +86,4 @@ These are not settings in the app.
     js/store/                 IndexedDB store (plus an in-memory store for tests)
     tests/                    harness, synthetic audio, node and headless-Chrome runners
     scripts/check-no-kjv-text.py
+Live test site: https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/

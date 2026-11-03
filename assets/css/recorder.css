@@ -1,0 +1,99 @@
+/* Record page: the old Voice Recorder (transcript-tidier.html) styles, ported and scoped under .tt so the
+   shared bar and the other pages keep the site restyle. Same black, white and #d00000, same OpenDyslexic,
+   same 52px buttons, card radius and passage text box. Additions (marked) for the tracker list and the stage lines. */
+.tt { max-width: 720px; margin: 0 auto; font-size: 17px; line-height: 1.6; }
+.tt h1 { font-size: 1.55rem; margin: 6px 0 2px; line-height: 1.3; overflow-wrap: anywhere; }
+.tt h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.tt .card { border: 1px solid #555; border-radius: 14px; padding: 16px; margin: 14px 0; background: #000; }
+.tt .btnrow { display: flex; flex-wrap: wrap; gap: 12px; }
+.tt button, .tt .btn { font: inherit; font-size: 1.02rem; color: #000; background: #fff; border: 2px solid #fff; border-radius: 12px;
+  min-height: 52px; padding: 10px 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; text-decoration: none; flex: 1 1 200px; touch-action: manipulation; }
+.tt button.ghost, .tt .btn.ghost { background: #000; color: #fff; }
+.tt button:disabled { opacity: .45; cursor: not-allowed; }
+.tt button:focus-visible, .tt .btn:focus-visible, .tt select:focus-visible, .tt a:focus-visible, .tt input:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.tt button.rec { background: #d00000; color: #fff; border-color: #d00000; font-weight: 700; }
+.tt button.rec::before { content: ''; width: 14px; height: 14px; border-radius: 50%; background: #fff; flex: none; }
+.tt button.rec.on { background: #fff; color: #d00000; border-color: #d00000; }
+.tt button.rec.on::before { border-radius: 2px; background: #d00000; animation: recblink 1s steps(2, start) infinite; }
+@keyframes recblink { to { visibility: hidden; } }
+.tt button.send { font-weight: 700; }
+.tt .status { margin-top: 12px; min-height: 1.6em; }
+.tt label { display: flex; align-items: flex-end; min-height: 44px; margin: 8px 0 4px; }
+.tt select { width: 100%; font: inherit; font-size: 16px; color: #fff; background: #000; border: 1px solid #888; border-radius: 10px; min-height: 48px; padding: 8px 10px; }
+.tt .check { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-top: 12px; cursor: pointer; }
+.tt .check input { width: 26px; height: 26px; margin: 0; flex: none; accent-color: #fff; }
+.tt details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: bold; }
+.tt .steps { list-style: none; padding: 0; margin: 8px 0 0; color: #bbb; font-size: .92rem; }
+.tt audio { width: 100%; margin: 12px 0; min-height: 54px; }
+.tt .summary { font-size: 1.08rem; }
+.tt .note { color: #ccc; font-size: .9rem; }
+.tt .sendstatus { margin: 10px 0 0; font-size: .95rem; }
+.tt .sendstatus.bad { color: #ffb3b3; }
+.tt details.pick { border: 1px solid #888; border-radius: 12px; margin: 0 0 14px; padding: 0 12px; }
+.tt details.pick[open] { padding-bottom: 12px; }
+.tt details.pick summary { min-height: 52px; font-weight: 700; font-size: 1.05rem; list-style: none; touch-action: manipulation; }
+.tt details.pick summary::-webkit-details-marker { display: none; }
+.tt details.pick summary::before { content: "\25B6"; display: inline-block; margin-right: 10px; font-size: .8em; transition: transform .15s; }
+.tt details.pick[open] summary::before { transform: rotate(90deg); }
+.tt .pickgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.tt .pickgrid .pf { min-width: 0; }
+.tt .pickgrid label { min-height: 0; margin: 8px 0 4px; font-size: .95rem; }
+@media (min-width: 640px) { .tt .pickgrid { grid-template-columns: 2fr 1fr 1fr 1fr; } }
+.tt .prow { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.tt .prow input[type=text] { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 1.05rem; color: #fff; background: #000; border: 2px solid #fff;
+  border-radius: 12px; min-height: 52px; padding: 8px 12px; }
+.tt .prow button { flex: 1 1 150px; white-space: nowrap; }
+.tt .pstatus { margin-top: 10px; min-height: 1.6em; overflow-wrap: anywhere; }
+.tt .pstatus.bad { border: 2px solid #fff; border-radius: 10px; padding: 8px 12px; }
+.tt .readtitle { margin: 0 0 14px; overflow-wrap: anywhere; }
+.tt .readtitle strong { display: block; font-size: 1.3rem; line-height: 1.35; }
+.tt .warn { border: 1px dashed #fff; border-radius: 10px; padding: 8px 12px; margin-top: 10px; }
+.tt .ptbox { margin-top: 14px; border: 1px solid #888; border-radius: 12px; padding: 12px 12px 6px; }
+.tt .pthead { margin: 0 0 8px; overflow-wrap: anywhere; }
+.tt .pthead strong { display: block; font-size: 1.15rem; line-height: 1.35; }
+.tt .pthead span { display: block; color: #ccc; font-size: .92rem; }
+.tt .ptctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 8px; }
+.tt .ptctl .check { margin: 0; min-height: 44px; flex: 1 1 0; min-width: 0; }
+.tt .ptsize { display: flex; gap: 8px; flex: none; }
+.tt .ptctl button { flex: 0 0 auto; min-width: 56px; min-height: 44px; padding: 6px 12px; }
+.tt .pttext { max-height: 40vh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; border-top: 1px solid #444;
+  padding: 8px 4px 8px 0; font-size: 1.25rem; line-height: 1.75; overflow-wrap: break-word; }
+.tt .pttext p { margin: 0 0 .7em; }
+.tt .pttext .vn { font-size: .6em; vertical-align: super; line-height: 0; color: #aaa; margin-right: .35em; user-select: none; -webkit-user-select: none; }
+.tt .pttext.nonum .vn { display: none; }
+.tt .pttext .ptmsg { color: #ccc; font-size: 1rem; }
+@media (min-width: 640px) { .tt .pttext { max-height: 50vh; } }
+
+/* --- additions for the per-verse flow --- */
+.tt .pttext .pv.cur { background: #fff; color: #000; border-radius: 4px; box-shadow: 0 0 0 3px #fff; }
+.tt .pttext .pv.cur .vn { color: #000; }
+.tt .pttext .pv.sent { color: #9a9a9a; }
+.tt .review .checks { list-style: none; padding: 0; margin: 4px 0 0; font-size: .92rem; }
+.tt .review .c-FAIL { color: #ffb3b3; } .tt .review .c-WARN { color: #ffd98a; }
+.tt details.vlist { margin-top: 12px; }
+.tt ol.verses { list-style: none; padding: 0; margin: 4px 0 0; }
+.tt ol.verses li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; border-top: 1px solid #333; min-height: 48px; }
+.tt ol.verses li.cur { font-weight: 700; }
+.tt ol.verses li.sent .vst { color: #b9f3cf; }
+.tt ol.verses .vst { color: #bbb; font-size: .92rem; }
+.tt button.link { flex: 0 0 auto; background: none; color: #fff; border: 0; text-decoration: underline; padding: 4px 0; min-height: 44px; font-weight: inherit; }
+.tt .chunkol { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 10px; max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.tt .chunkbtn { display: flex; flex-direction: column; gap: 2px; border: 1px solid #888; border-radius: 12px; padding: 10px 14px; min-height: 56px;
+  color: #fff; text-decoration: none; touch-action: manipulation; }
+.tt .chunkbtn strong { font-size: 1.08rem; }
+.tt .chunkbtn .cmeta { color: #ccc; font-size: .9rem; }
+.tt .chunk.next .chunkbtn { border: 3px solid #fff; background: #111; }
+.tt .chunk.cur .chunkbtn { box-shadow: inset 0 0 0 3px #d00000; }
+.tt.has-p .chunkol { max-height: 28vh; }
+.tt .chunk.done .chunkbtn { opacity: .7; }
+.tt .chunkbtn.off { opacity: .6; }
+.tt .nexttag { align-self: flex-start; background: #fff; color: #000; font-weight: 700; border-radius: 8px; padding: 2px 10px; font-size: .9rem; }
+.tt .steps.pipeline li { padding: 6px 0 6px 1.9em; text-indent: -1.9em; border-top: 1px solid #222; overflow-wrap: anywhere; }
+.tt .steps.pipeline li::before { display: inline-block; width: 1.9em; text-indent: 0; }
+.tt .steps li.st-todo::before { content: '\25CB'; }
+.tt .steps li.st-busy { color: #fff; font-weight: 700; } .tt .steps li.st-busy::before { content: '\25B6'; }
+.tt .steps li.st-done { color: #fff; } .tt .steps li.st-done::before { content: '\2713'; color: #b9f3cf; }
+.tt .steps li.st-warn { color: #ffd98a; } .tt .steps li.st-warn::before { content: '!'; }
+.tt .steps li.st-bad { color: #ffb3b3; font-weight: 700; } .tt .steps li.st-bad::before { content: '\2717'; }
+.tt .steps li.st-wait { color: #bcd6ff; } .tt .steps li.st-wait::before { content: '\23F8'; }

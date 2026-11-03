@@ -1,9 +1,10 @@
 // Google Drive v3 REST client for drive.file scope (only sees files/folders this app created).
 // Implements folder find/create, multipart (<5 MB) and resumable (>=5 MB) upload, md5 verification, and
-// moving an old take into '_replaced' with a take-numbered name. Nothing is ever deleted or trashed.
+// one file per verse: a retake overwrites the existing verse file's content in place (same file id and name).
+// Stitched outputs still move an older file into 'Stitched/_replaced'. Nothing is ever trashed or DELETEd.
 // fetch is injectable so the request logic can be exercised with a mock; UNTESTED against the real Drive API.
 import { DRIVE_ROOT_FOLDER, DRIVE_REPLACED_FOLDER } from '../config.js';
-import { folderPathOf, fileNameOf, takeFileNameOf } from '../kjv/ref.js';
+import { folderPathOf, fileNameOf } from '../kjv/ref.js';
 import { md5Hex } from '../stitch/hash.js';
 
 const API = 'https://www.googleapis.com/drive/v3';
@@ -62,13 +63,16 @@ export class DriveClient {
     body.set(head); body.set(bytes, head.length); body.set(tail, head.length + bytes.length);
     return { body, contentType: `multipart/related; boundary=${boundary}` };
   }
-  async uploadMultipart(meta, bytes, mime) {
+  /** fileId given -> PATCH (replace that file's content and metadata in place); otherwise POST (create). */
+  async uploadMultipart(meta, bytes, mime, fileId = null) {
     const { body, contentType } = this.multipartBody(meta, bytes, mime);
-    return this.req(`${UPLOAD}/files?uploadType=multipart&fields=${encodeURIComponent(FIELDS)}`, { method: 'POST', headers: { 'Content-Type': contentType }, body });
+    const path = fileId ? `/files/${encodeURIComponent(fileId)}` : '/files';
+    return this.req(`${UPLOAD}${path}?uploadType=multipart&fields=${encodeURIComponent(FIELDS)}`, { method: fileId ? 'PATCH' : 'POST', headers: { 'Content-Type': contentType }, body });
   }
-  async uploadResumable(meta, bytes, mime, { chunkRetries = 3 } = {}) {
-    const init = await this.req(`${UPLOAD}/files?uploadType=resumable&fields=${encodeURIComponent(FIELDS)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(bytes.length) },
+  async uploadResumable(meta, bytes, mime, { chunkRetries = 3, fileId = null } = {}) {
+    const path = fileId ? `/files/${encodeURIComponent(fileId)}` : '/files';
+    const init = await this.req(`${UPLOAD}${path}?uploadType=resumable&fields=${encodeURIComponent(FIELDS)}`, {
+      method: fileId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(bytes.length) },
       body: JSON.stringify(meta),
     }, { raw: true });
     if (!init.ok) throw new DriveError(init.status, await init.text().catch(() => ''));
@@ -92,6 +96,13 @@ export class DriveClient {
     const bytes = toBytes(data);
     return bytes.length < MULTIPART_LIMIT ? this.uploadMultipart(meta, bytes, mime) : this.uploadResumable(meta, bytes, mime);
   }
+  /** Replace an existing file's content (and the given metadata) in place: same id, same name, same folder.
+   *  Drive only swaps the content once the new upload has fully arrived, so a failed upload leaves the old file as it was.
+   *  'parents' is not allowed in an update body, so it is stripped. */
+  async updateContent(fileId, meta, data, mime = 'audio/wav') {
+    const bytes = toBytes(data); const { parents, ...m } = meta;
+    return bytes.length < MULTIPART_LIMIT ? this.uploadMultipart(m, bytes, mime, fileId) : this.uploadResumable(m, bytes, mime, { fileId });
+  }
   async moveAndRename(file, newName, fromParent, toParent) {
     return this.req(`${API}/files/${encodeURIComponent(file.id)}?addParents=${encodeURIComponent(toParent)}&removeParents=${encodeURIComponent(fromParent)}&fields=${encodeURIComponent(FIELDS)}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }),
@@ -100,8 +111,10 @@ export class DriveClient {
 
   /**
    * Upload an accepted take as 'KJV Recordings/NN Book/Book C/Book C-V.wav'.
-   * If a different take already has the canonical name, it is moved (not deleted) to '<chapter>/_replaced/'
-   * and renamed 'Book C-V take N YYYYMMDD-HHMMSS.wav'. Verifies md5Checksum. Returns the Drive file.
+   * One file per verse: if the verse file already exists, a new take overwrites its content in place (same file id
+   * and name, no version suffix, no '_replaced' copy). The new content is uploaded in one request that only takes
+   * effect once complete, so if it fails the old take stays untouched and the queue retries. Verifies md5Checksum.
+   * Returns the Drive file.
    */
   async uploadVerse(verseId, wavBytes, { takeId, takeNo }) {
     const bytes = toBytes(wavBytes);
@@ -109,13 +122,9 @@ export class DriveClient {
     const name = fileNameOf(verseId);
     const existing = await this.findChild(name, folderId);
     const md5 = md5Hex(bytes);
-    if (existing) {
-      if (existing.appProperties?.takeId === String(takeId) && existing.md5Checksum === md5) return existing; // already done (resume)
-      const replacedId = await this.ensurePath([...folderPathOf(verseId, DRIVE_ROOT_FOLDER), DRIVE_REPLACED_FOLDER]);
-      const oldNo = existing.appProperties?.takeNo || 'old';
-      await this.moveAndRename(existing, takeFileNameOf(verseId, oldNo, new Date(existing.createdTime || Date.now())), folderId, replacedId);
-    }
-    const file = await this.upload({ name, parents: [folderId], mimeType: 'audio/wav', appProperties: { verseId, takeId: String(takeId), takeNo: String(takeNo) } }, bytes);
+    if (existing && existing.appProperties?.takeId === String(takeId) && existing.md5Checksum === md5) return existing; // already done (resume)
+    const meta = { name, parents: [folderId], mimeType: 'audio/wav', appProperties: { verseId, takeId: String(takeId), takeNo: String(takeNo) } };
+    const file = existing ? await this.updateContent(existing.id, meta, bytes) : await this.upload(meta, bytes);
     if (file.md5Checksum && file.md5Checksum !== md5) throw new DriveError(0, `md5 mismatch for ${name}`);
     return file;
   }
@@ -135,5 +144,14 @@ export class DriveClient {
     const file = await this.upload({ name, parents: [folderId], mimeType: mime }, bytes, mime);
     if (file.md5Checksum && file.md5Checksum !== md5Hex(bytes)) throw new DriveError(0, `md5 mismatch for ${name}`);
     return file;
+  }
+
+  /** Write (or overwrite in place) a small JSON file in 'KJV Recordings/<folder>/', e.g. the render-job file for the headless renderer. */
+  async putJson(folder, name, obj) {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj, null, 2));
+    const folderId = await this.ensurePath([DRIVE_ROOT_FOLDER, folder]);
+    const existing = await this.findChild(name, folderId);
+    const meta = { name, mimeType: 'application/json' };
+    return existing ? this.updateContent(existing.id, meta, bytes, 'application/json') : this.upload({ ...meta, parents: [folderId] }, bytes, 'application/json');
   }
 }

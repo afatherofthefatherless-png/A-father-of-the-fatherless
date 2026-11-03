@@ -20,7 +20,7 @@ const DRIVE_FILES = 'https://www.googleapis.com/drive/v3/files/';
 
 export const MESSAGES = Object.freeze({
   noKey: 'Google API key not set up yet',
-  signedOut: 'Sign in with Google (Drive tab) to load the verse text.',
+  signedOut: 'Not signed in to Google. Tap Sign in to show the verse text when you want it; you can record without it.',
   choose: 'Choose the verse text file from Google Drive',      // the button label
   notChosen: 'No verse text file chosen yet.',
   forgotten: 'The verse text file you chose before could not be opened. Please choose it again.',

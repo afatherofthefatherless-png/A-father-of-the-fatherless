@@ -3,20 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#000000">
 <title>KJV reading site</title>
+<link rel="preload" href="assets/fonts/opendyslexic-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/recorder.css">
 </head>
 <body>
-<header>
-  <a class="brand" href="#/home">KJV reading site</a>
-  <nav aria-label="Main">
+<header class="top"><div class="bar-in">
+  <div class="brandrow">
+    <a class="brand" href="#/home">KJV reading site</a>
+    <span id="drive-badge"></span>
+  </div>
+  <nav class="tabs" aria-label="Main">
     <a href="#/home">Home</a>
     <a href="#/record">Record</a>
     <a href="#/stitch">Stitch</a>
     <a href="#/drive">Drive</a>
   </nav>
-  <span id="drive-badge"></span>
-</header>
+</div></header>
+<div class="apps-bar"><nav class="apps" id="apps-nav" aria-label="Other apps"></nav></div>
 <main id="main"></main>
 <script type="module" src="js/app.js"></script>
 </body>

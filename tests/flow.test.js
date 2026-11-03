@@ -127,19 +127,24 @@ function mockDrive() {
       return res(200, { files: [...files.values()].filter(f => f.name === name && f.parents.includes(parent) && (f.mimeType === 'application/vnd.google-apps.folder') === folder) });
     }
     if (method === 'POST' && u.pathname === '/drive/v3/files') { const m = JSON.parse(init.body); const f = { id: 'f' + ++n, ...m, createdTime: '2026-11-03T09:00:00Z' }; files.set(f.id, f); return res(200, f); }
-    if (method === 'POST' && u.searchParams.get('uploadType') === 'multipart') {
+    const upId = (/^\/upload\/drive\/v3\/files\/([^/]+)$/.exec(u.pathname) || [])[1]; // PATCH upload = update existing file in place
+    if ((method === 'POST' || (method === 'PATCH' && upId)) && u.searchParams.get('uploadType') === 'multipart') {
+      if (mock.failUpload) { mock.failUpload--; return res(500, { error: 'upload failed' }); }
       const b = new TextDecoder('latin1').decode(init.body); const meta = JSON.parse(b.split('\r\n\r\n')[1].split('\r\n')[0]);
-      const start = init.body.indexOf(0x52) ; // not used
       const head = b.indexOf('\r\n\r\n', b.indexOf('Content-Type: audio') ) + 4; const bytes = init.body.subarray(head, init.body.length - (b.length - b.lastIndexOf('\r\n--')));
-      const f = { id: 'f' + ++n, ...meta, md5Checksum: mock.badMd5 ? 'x' : md5Hex(bytes), createdTime: '2026-11-03T09:40:12Z' }; files.set(f.id, f); return res(200, f);
+      const md5Checksum = mock.badMd5 ? 'x' : md5Hex(bytes);
+      if (upId) { if ('parents' in meta) return res(403, { error: 'parents not writable in update' }); const f = files.get(upId); Object.assign(f, meta, { md5Checksum, size: bytes.length }); return res(200, f); }
+      const f = { id: 'f' + ++n, ...meta, md5Checksum, size: bytes.length, createdTime: '2026-11-03T09:40:12Z' }; files.set(f.id, f); return res(200, f);
     }
-    if (method === 'POST' && u.searchParams.get('uploadType') === 'resumable') { mock.pending = JSON.parse(init.body); mock.got = 0; return res(200, {}, { Location: 'https://www.googleapis.com/upload/drive/v3/files?upload_id=abc' }); }
+    if ((method === 'POST' || (method === 'PATCH' && upId)) && u.searchParams.get('uploadType') === 'resumable') { mock.pending = JSON.parse(init.body); mock.pendingId = upId || null; mock.got = 0; return res(200, {}, { Location: 'https://www.googleapis.com/upload/drive/v3/files?upload_id=abc' }); }
     if (method === 'PUT') {
       const cr = init.headers['Content-Range'];
       if (cr.startsWith('bytes */')) return mock.got ? res(308, {}, { Range: `bytes=0-${mock.got - 1}` }) : res(308, {});
       const from = +cr.split(' ')[1].split('-')[0];
       if (mock.dropResumable) { mock.dropResumable = false; mock.got = from + 1000000; throw new TypeError('network dropped'); }
-      mock.resumedFrom = from; const f = { id: 'f' + ++n, ...mock.pending, md5Checksum: mock.fullMd5, createdTime: '2026-11-03T09:40:12Z' }; files.set(f.id, f); return res(200, f);
+      mock.resumedFrom = from;
+      if (mock.pendingId) { const f = files.get(mock.pendingId); Object.assign(f, mock.pending, { md5Checksum: mock.fullMd5 }); return res(200, f); }
+      const f = { id: 'f' + ++n, ...mock.pending, md5Checksum: mock.fullMd5, createdTime: '2026-11-03T09:40:12Z' }; files.set(f.id, f); return res(200, f);
     }
     if (method === 'PATCH') { const id = u.pathname.split('/').pop(); const f = files.get(id); const m = JSON.parse(init.body); f.name = m.name; f.parents = f.parents.filter(p => p !== u.searchParams.get('removeParents')).concat(u.searchParams.get('addParents')); return res(200, f); }
     if (method === 'DELETE') throw new Error('DELETE must never be called');
@@ -161,14 +166,35 @@ test('drive (mock): folders created once, verse uploaded to the canonical path w
   const p = await d.uploadVerse('PSA.23.1', bytes(100), { takeId: 'PSA.23.1#1', takeNo: 1 });
   eq(pathOf(m.files, m.files.get(p.id)), 'KJV Recordings/19 Psalms/Psalm 23/Psalm 23-1.wav');
 });
-test('drive (mock): a new take moves the old file to _replaced with a take name; nothing deleted; same take is idempotent', async () => {
+const audioFiles = files => [...files.values()].filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
+test('drive (mock): a retake overwrites the verse file in place (same id and name, one file, no _replaced); same take is idempotent', async () => {
   const m = mockDrive(), d = new DriveClient({ getToken: () => 'tok', fetch: m.fetch });
   const a = await d.uploadVerse('GEN.3.14', bytes(5000), { takeId: 'GEN.3.14#1', takeNo: 1 });
   const again = await d.uploadVerse('GEN.3.14', bytes(5000), { takeId: 'GEN.3.14#1', takeNo: 1 }); eq(again.id, a.id);
   const b = await d.uploadVerse('GEN.3.14', bytes(6000), { takeId: 'GEN.3.14#2', takeNo: 2 });
-  eq(pathOf(m.files, m.files.get(b.id)), 'KJV Recordings/01 Genesis/Genesis 3/Genesis 3-14.wav');
-  const old = m.files.get(a.id); ok(/^KJV Recordings\/01 Genesis\/Genesis 3\/_replaced\/Genesis 3-14 take 1 \d{8}-\d{6}\.wav$/.test(pathOf(m.files, old)), pathOf(m.files, old));
+  eq(b.id, a.id, 'same Drive file id'); eq(pathOf(m.files, m.files.get(b.id)), 'KJV Recordings/01 Genesis/Genesis 3/Genesis 3-14.wav');
+  eq(b.appProperties.takeNo, '2'); eq(b.md5Checksum, md5Hex(bytes(6000))); eq(b.size, 6000);
+  eq(audioFiles(m.files).length, 1, 'one file per verse');
+  ok(![...m.files.values()].some(f => f.name === '_replaced'), 'no _replaced folder for verse takes');
+  ok(m.log.includes(`PATCH https://www.googleapis.com/upload/drive/v3/files/${a.id}`), 'content updated via PATCH upload');
   ok(!m.log.some(l => l.startsWith('DELETE')));
+});
+test('drive (mock): a failed retake upload leaves the old verse file untouched; the retry then overwrites it', async () => {
+  const m = mockDrive(), d = new DriveClient({ getToken: () => 'tok', fetch: m.fetch });
+  const a = await d.uploadVerse('GEN.3.14', bytes(5000), { takeId: 'GEN.3.14#1', takeNo: 1 });
+  m.failUpload = 1;
+  await throws(() => d.uploadVerse('GEN.3.14', bytes(6000), { takeId: 'GEN.3.14#2', takeNo: 2 }), /Drive 500/);
+  const kept = m.files.get(a.id); eq(kept.appProperties.takeNo, '1'); eq(kept.md5Checksum, md5Hex(bytes(5000))); eq(audioFiles(m.files).length, 1);
+  const b = await d.uploadVerse('GEN.3.14', bytes(6000), { takeId: 'GEN.3.14#2', takeNo: 2 });
+  eq(b.id, a.id); eq(b.appProperties.takeNo, '2'); eq(audioFiles(m.files).length, 1);
+});
+test('drive (mock): a >=5 MB retake overwrites in place via a resumable PATCH session', async () => {
+  const m = mockDrive(), d = new DriveClient({ getToken: () => 'tok', fetch: m.fetch });
+  const a = await d.uploadVerse('GEN.1.1', bytes(5000), { takeId: 'GEN.1.1#1', takeNo: 1 });
+  const big = bytes(MULTIPART_LIMIT + 10); m.fullMd5 = md5Hex(big);
+  const b = await d.uploadVerse('GEN.1.1', big, { takeId: 'GEN.1.1#2', takeNo: 2 });
+  eq(b.id, a.id); eq(b.appProperties.takeNo, '2'); eq(audioFiles(m.files).length, 1); ok(!('parents' in m.pending), 'parents not sent in an update');
+  ok(m.log.includes(`PATCH https://www.googleapis.com/upload/drive/v3/files/${a.id}`));
 });
 test('drive (mock): >=5 MB uses resumable upload and resumes after a dropped connection', async () => {
   const m = mockDrive(), d = new DriveClient({ getToken: () => 'tok', fetch: m.fetch }); const big = bytes(MULTIPART_LIMIT + 10);

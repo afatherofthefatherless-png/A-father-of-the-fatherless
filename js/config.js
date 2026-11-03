@@ -12,7 +12,7 @@ export const GOOGLE_API_KEY = 'AIzaSyAJhoFJTyoEIMx00CmQRKVe7uOPD-lOhUQ';
 export const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split('-')[0]; // '456053541349'
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'; // narrowest scope; the only one requested
 export const DRIVE_ROOT_FOLDER = 'KJV Recordings';
-export const DRIVE_REPLACED_FOLDER = '_replaced'; // old takes are moved here, never deleted
+export const DRIVE_REPLACED_FOLDER = '_replaced'; // stitched outputs only: an older stitched file is moved here. Verse takes overwrite in place.
 
 // Onset detection (PLAN.md section d). Analysis frames are 20 ms long on a 10 ms hop.
 export const ONSET = Object.freeze({
@@ -59,6 +59,19 @@ export const GATE = Object.freeze({
   silencePassMax: 2.5, silenceWarnMax: 4.0,
   lufsPassTol: 1, spreadPassMax: 2, spreadWarnMax: 3,
 });
+
+// The older apps (still live). Linked from the shared bar at the top of every page; each opens in a new tab.
+export const OLD = Object.freeze({
+  tracker: 'https://xwzn961.sharehtml.org/',      // Reading Tracker
+  recorder: 'https://h2bavvr.sharehtml.org/',     // King James Bible Voice Recorder
+  reader: 'https://93fyr0c.sharehtml.org/',       // Rolling Reader
+  xref: 'https://ugz9yeu.sharehtml.org/',         // Cross-references (arc diagram)
+  concordance: 'https://q97d9yl.sharehtml.org/',  // Concordance of Even
+});
+export const OLD_APPS = Object.freeze([
+  ['Reading Tracker', 'tracker'], ['Voice Recorder', 'recorder'], ['Rolling Reader', 'reader'],
+  ['Cross-references', 'xref'], ['Concordance of Even', 'concordance'],
+]);
 
 // Reading Tracker keys from the old page. Listed so nothing in this site ever writes them by accident.
 export const TRACKER_KEYS = Object.freeze([

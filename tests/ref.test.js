@@ -27,10 +27,6 @@ test('ref: parseFileName rejects non-canonical names', () => {
     eq(R.parseFileName(bad), null, bad);
   eq(R.parseFileName('1 Samuel 3-4.wav'), '1SA.3.4'); eq(R.parseFileName('Song of Solomon 1-1.wav'), 'SNG.1.1');
 });
-test('ref: kept-take name never parses as a verse file', () => {
-  const n = R.takeFileNameOf('GEN.3.14', 2, new Date(2026, 10, 3, 9, 40, 12));
-  eq(n, 'Genesis 3-14 take 2 20261103-094012.wav'); eq(R.parseFileName(n), null);
-});
 test('ref: passage parse/format/stem/expand (single chapter)', () => {
   const p = R.parsePassage('Genesis 3:14-19');
   eq(R.formatPassage(p), 'Genesis 3:14-19'); eq(R.passageStem(p), 'Genesis 3-14 to 3-19');
@@ -64,3 +60,20 @@ test('ref: global index matches tracker gi() layout', () => {
   eq(R.idFromGlobalIndex(31102), null);
 });
 test('ref: parseId validates', () => { ok(R.parseId('GEN.3.14')); eq(R.parseId('GEN.3.25'), null); eq(R.parseId('Gen.3.14'), null); ok(R.parseId('1SA.3.4')); });
+test('ref: forgiving passage entry (spaces, colon, dots, abbreviations, numbered books)', () => {
+  const cases = {
+    'Genesis 1 1': 'Genesis 1:1', 'Genesis 1:1': 'Genesis 1:1', 'Gen 1:1': 'Genesis 1:1', 'gen 1 1-5': 'Genesis 1:1-5',
+    'Genesis 3:14-19': 'Genesis 3:14-19', 'Genesis 3 14-19': 'Genesis 3:14-19', 'gen. 3.14-19': 'Genesis 3:14-19', 'GEN 3:14 - 19': 'Genesis 3:14-19',
+    '1 John 2 3': '1 John 2:3', '1John 2:3-5': '1 John 2:3-5', 'I John 1 9': '1 John 1:9', 'First John 4:8': '1 John 4:8', '1 jn 1 9': '1 John 1:9',
+    'Ps 23': 'Psalm 23:1-6', 'Phil 4 13': 'Philippians 4:13', 'Philem 1 4': 'Philemon 1:4', 'Deut 6 4': 'Deuteronomy 6:4', 'Mt 5 3-12': 'Matthew 5:3-12',
+    'jn 3 16': 'John 3:16', 'Rev 22 21': 'Revelation 22:21', '1 Sam 3 10': '1 Samuel 3:10', '2 kgs 2 11': '2 Kings 2:11',
+    'Genesis 1 24 - 2 3': 'Genesis 1:24-2:3', 'Jude 3': 'Jude 1:3', 'Jude 1': 'Jude 1:1-25', 'Song of Songs 2 1': 'Song of Solomon 2:1',
+  };
+  for (const [inp, want] of Object.entries(cases)) eq(R.formatPassage(R.parsePassage(inp)), want, inp);
+});
+test('ref: forgiving entry still rejects nonsense with a plain message', async () => {
+  await throws(() => R.parsePassage('Genesis'), /Add a chapter/);
+  await throws(() => R.parsePassage('Hezekiah 1 1'), /Unknown book/);
+  await throws(() => R.parsePassage('J 1 1'), /Unknown book/); // too short to be sure
+  await throws(() => R.parsePassage('Genesis 1 1 1'), /Cannot read/);
+});

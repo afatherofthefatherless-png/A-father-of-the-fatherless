@@ -4,4 +4,5 @@ import './audio.test.js';
 import './gate-stitch.test.js';
 import './flow.test.js';
 import './text-source.test.js';
+import './rebase.test.js';
 export { runAll } from './lib.js';

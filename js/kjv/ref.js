@@ -27,9 +27,47 @@ const chapterOffset = new Map(); // code -> array of global index of verse 1 of 
   }
 }
 
+// Forgiving book names: 'Gen', 'gen.', 'GEN', '1 John', '1John', '1st John', 'I John', 'First John', 'Ps', 'Psalms',
+// 'Song of Songs', 'Phil' (Philippians), 'Philem' (Philemon). Any unique start of a book name works too ('Deut', 'Rev').
+const EXTRA_ALIASES = {
+  GEN: 'gn ge', EXO: 'ex exod', LEV: 'lv le', NUM: 'nm nu', DEU: 'dt deut', JOS: 'josh jsh', JDG: 'jdg jg judg', RUT: 'rth ru',
+  '1SA': '1 sam 1 sm', '2SA': '2 sam 2 sm', '1KI': '1 kgs 1 kin', '2KI': '2 kgs 2 kin', '1CH': '1 chr 1 chron', '2CH': '2 chr 2 chron',
+  PSA: 'ps psa pss psalm psalms', PRO: 'prov prv pr', ECC: 'eccl eccles qoh', SNG: 'song sos cant song of songs canticles',
+  ISA: 'is isa', JER: 'jer jr', LAM: 'lam la', EZK: 'ezek eze ezk', DAN: 'dn da', HOS: 'hos ho', JOL: 'jl', AMO: 'am amos',
+  OBA: 'ob obad', JON: 'jnh jon', MIC: 'mic mi', NAM: 'nah na', HAB: 'hab hb', ZEP: 'zeph zp', HAG: 'hag hg', ZEC: 'zech zc', MAL: 'mal ml',
+  MAT: 'mt matt mat', MRK: 'mk mr mar mrk', LUK: 'lk lu luk', JHN: 'jn jhn joh', ACT: 'ac acts', ROM: 'rm ro rom',
+  '1CO': '1 cor', '2CO': '2 cor', GAL: 'ga gal', EPH: 'eph ephes', PHP: 'phil php pp', COL: 'col', '1TH': '1 thess 1 th', '2TH': '2 thess 2 th',
+  '1TI': '1 tim 1 tm', '2TI': '2 tim 2 tm', TIT: 'tit ti', PHM: 'philem phm pm', HEB: 'heb', JAS: 'jas jm', '1PE': '1 pet 1 pt', '2PE': '2 pet 2 pt',
+  '1JN': '1 jn 1 jhn 1 joh', '2JN': '2 jn 2 jhn 2 joh', '3JN': '3 jn 3 jhn 3 joh', JUD: 'jud jude', REV: 'rev re rv revelations revelation of john apocalypse',
+};
+/** Book key: lower case, no dots, '1st'/'i'/'first' -> '1', '1john' -> '1 john'. */
+function bookKey(name) {
+  let k = norm(name);
+  k = k.replace(/^(first|1st|i)\s+/, '1 ').replace(/^(second|2nd|ii)\s+/, '2 ').replace(/^(third|3rd|iii)\s+/, '3 ');
+  k = k.replace(/^([1-3])\s*(?=[a-z])/, '$1 ');
+  return k;
+}
+for (const [code, list] of Object.entries(EXTRA_ALIASES)) {
+  const b = byCode.get(code); const words = list.split(' '); const out = [];
+  for (let i = 0; i < words.length; i++) { // '1 sam' style pairs: a lone digit joins the next word
+    if (/^[1-3]$/.test(words[i]) && words[i + 1]) { out.push(words[i] + ' ' + words[i + 1]); i++; } else out.push(words[i]);
+  }
+  // multi-word aliases such as 'song of songs' were split above: put the known phrases back
+  if (code === 'SNG') out.push('song of songs'); if (code === 'REV') out.push('revelation of john');
+  for (const a of out) if (!alias.has(bookKey(a))) alias.set(bookKey(a), b);
+}
+const allKeys = BOOKS.map(b => ({ b, keys: [bookKey(b.name), bookKey(b.refBook), bookKey(b.code)] }));
+
 export function findBook(name) {
-  const b = alias.get(norm(name));
-  return b || null;
+  const k = bookKey(name);
+  if (!k) return null;
+  const hit = alias.get(k) || alias.get(norm(name)); if (hit) return hit;
+  // unique start of a book name, at least 2 letters ('deut', 'rev', '1 thes')
+  const letters = k.replace(/[^a-z]/g, '');
+  if (letters.length < 2) return null;
+  const found = new Set();
+  for (const { b, keys } of allKeys) if (keys.some(x => x.startsWith(k))) found.add(b);
+  return found.size === 1 ? [...found][0] : null;
 }
 export function bookByCode(code) { return byCode.get(code) || null; }
 export function verseCount(code, chapter) {
@@ -67,12 +105,6 @@ export function parseFileName(name) {
   return isValid(b.code, ch, v) ? `${b.code}.${ch}.${v}` : null;
 }
 
-/** Kept-old-take name: 'Genesis 3-14 take 2 20261103-094012.wav' (never parses as a canonical verse file). */
-export function takeFileNameOf(id, takeNo, date = new Date()) {
-  const p2 = n => String(n).padStart(2, '0');
-  const ts = `${date.getFullYear()}${p2(date.getMonth() + 1)}${p2(date.getDate())}-${p2(date.getHours())}${p2(date.getMinutes())}${p2(date.getSeconds())}`;
-  return `${stemOf(id)} take ${takeNo} ${ts}.wav`;
-}
 
 /** Drive folder path for a verse: ['KJV Recordings', '01 Genesis', 'Genesis 3']. */
 export function folderPathOf(id, root = 'KJV Recordings') {
@@ -95,33 +127,44 @@ export function idFromGlobalIndex(g) {
 }
 
 /**
- * Parse a passage. Accepts:
- *   'Genesis 3:14-19', 'Genesis 3:14–19', 'Genesis 1:24-2:3', 'Genesis 3:14', 'Genesis 3' (whole chapter),
- *   'Psalms 23:1-6', 'Ps 23', and the stem form 'Genesis 3-14 to 3-19' / 'Genesis 1-24 to 2-3'.
- * Returns { code, start:{chapter,verse}, end:{chapter,verse} } or throws.
+ * Parse a passage. Forgiving: spaces, a colon or a dot between chapter and verse, abbreviations, numbered books.
+ *   'Genesis 3:14-19', 'Genesis 3 14-19', 'gen 3.14-19', 'Gen 1:1', 'Genesis 1 1', '1 John 2 3', '1John 2:3-5',
+ *   'Genesis 3:14–19', 'Genesis 1:24-2:3', 'Genesis 1 24 - 2 3', 'Genesis 3' (whole chapter), 'Ps 23',
+ *   'Jude 3' (one-chapter books: the number is the verse), and the stem form 'Genesis 3-14 to 3-19'.
+ * Returns { code, start:{chapter,verse}, end:{chapter,verse} } or throws with a plain message.
  */
 export function parsePassage(input) {
-  const s = String(input).replace(/[\u2013\u2014]/g, '-').replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
-  let m = /^(.+?) (\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/.exec(s);
-  let stemForm = /^(.+?) (\d+)-(\d+)(?: to (\d+)-(\d+))?$/.exec(s);
-  let book, c1, v1, c2, v2;
-  if (stemForm && /\bto\b/.test(s)) {
-    book = findBook(stemForm[1]); c1 = +stemForm[2]; v1 = +stemForm[3]; c2 = +stemForm[4]; v2 = +stemForm[5];
-  } else if (m) {
-    book = findBook(m[1]);
-    c1 = +m[2];
-    if (m[3] === undefined) { // 'Genesis 3' (whole chapter); 'Genesis 3-4' is ambiguous -> reject
-      if (m[4] !== undefined) throw new Error(`Ambiguous passage "${input}": use Genesis 3:1-4:26 or Genesis 3:4`);
-      if (!book) throw new Error(`Unknown book in "${input}"`);
-      v1 = 1; c2 = c1; v2 = verseCount(book.code, c1);
+  let s = String(input ?? '').replace(/[\u2013\u2014\u2212]/g, '-').replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) throw new Error('Type a passage, for example Genesis 3:14-19');
+  // split the book from the numbers: the book may start with 1-3 ('1 John', '1John') and may contain dots or spaces
+  const m0 = /^((?:[1-3]|i{1,3}|first|second|third|1st|2nd|3rd)?\s*[A-Za-z][A-Za-z .']*?)\.?\s*(\d.*)?$/i.exec(s);
+  if (!m0) throw new Error(`Cannot read passage "${input}"`);
+  const book = findBook(m0[1]);
+  if (!book) throw new Error(`Unknown book in "${input}". Try a name such as Genesis, Gen, Psalm or 1 John`);
+  let nums = (m0[2] || '').trim();
+  if (!nums) throw new Error(`Add a chapter to "${input}", for example ${book.refBook} 1`);
+  const single = book.counts.length === 1;
+  let c1, v1, c2, v2;
+  const stem = /^(\d+)-(\d+) to (\d+)-(\d+)$/i.exec(nums);
+  if (stem) { c1 = +stem[1]; v1 = +stem[2]; c2 = +stem[3]; v2 = +stem[4]; }
+  else {
+    nums = nums.replace(/(\d)\s*[.:]\s*(\d)/g, '$1:$2').replace(/\s*-\s*/g, '-').replace(/(\d+) (\d+)/g, '$1:$2');
+    const m = /^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/.exec(nums);
+    if (!m) throw new Error(`Cannot read the numbers in "${input}". Write it like ${book.refBook} 3:14-19`);
+    if (single && m[2] === undefined && m[1] === '1' && m[3] === undefined) { c1 = c2 = 1; v1 = 1; v2 = book.counts[0]; } // 'Jude 1': the whole book
+    else if (single && m[2] === undefined) { // 'Jude 3', 'Jude 3-5': verses of chapter 1
+      c1 = c2 = 1; v1 = +m[1]; v2 = m[3] !== undefined && m[4] === undefined ? +m[3] : v1;
+      if (m[4] !== undefined) throw new Error(`Cannot read passage "${input}"`);
+    } else if (m[2] === undefined) { // 'Genesis 3' (whole chapter); 'Genesis 3-4' is ambiguous -> reject
+      if (m[3] !== undefined) throw new Error(`Ambiguous passage "${input}": use ${book.refBook} ${m[1]}:1-${m[3]}:${verseCount(book.code, +m[3]) || 1} or ${book.refBook} ${m[1]}:${m[3]}`);
+      c1 = c2 = +m[1]; v1 = 1; v2 = verseCount(book.code, c1);
     } else {
-      v1 = +m[3];
-      if (m[4] === undefined) { c2 = c1; v2 = v1; }
-      else if (m[5] === undefined) { c2 = c1; v2 = +m[4]; }
-      else { c2 = +m[4]; v2 = +m[5]; }
+      c1 = +m[1]; v1 = +m[2];
+      if (m[3] === undefined) { c2 = c1; v2 = v1; }
+      else if (m[4] === undefined) { c2 = c1; v2 = +m[3]; }
+      else { c2 = +m[3]; v2 = +m[4]; }
     }
-  } else throw new Error(`Cannot read passage "${input}"`);
-  if (!book) throw new Error(`Unknown book in "${input}"`);
+  }
   if (!isValid(book.code, c1, v1) || !isValid(book.code, c2, v2)) throw new Error(`No such verse in "${input}"`);
   if (c2 < c1 || (c2 === c1 && v2 < v1)) throw new Error(`Passage runs backwards: "${input}"`);
   return { code: book.code, start: { chapter: c1, verse: v1 }, end: { chapter: c2, verse: v2 } };

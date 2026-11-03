@@ -50,7 +50,7 @@ test('text: no key, not signed in, no file chosen -> the plain messages, never t
   let r = await loadTextSource({ store, getToken: tok, fetchImpl: f, localStorage: fakeLs(), apiKey: '' });
   eq(r.status, 'no-key'); eq(r.message, 'Google API key not set up yet'); eq(r.source.loaded, false);
   r = await loadTextSource({ store, getToken: () => null, fetchImpl: f, localStorage: fakeLs(), apiKey: 'k' });
-  eq(r.status, 'signed-out'); eq(r.message, 'Sign in with Google (Drive tab) to load the verse text.');
+  eq(r.status, 'signed-out'); eq(r.message, 'Not signed in to Google. Tap Sign in to show the verse text when you want it; you can record without it.');
   r = await loadTextSource({ store, getToken: tok, fetchImpl: f, localStorage: fakeLs(), apiKey: 'k' });
   eq(r.status, 'choose'); eq(r.message, MESSAGES.notChosen); eq(MESSAGES.choose, 'Choose the verse text file from Google Drive');
   eq(f.calls.length, 0); ok(MISSING_MESSAGE);

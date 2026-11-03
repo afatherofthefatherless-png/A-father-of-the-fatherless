@@ -3,7 +3,7 @@ import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, passageS
 import { Store, requestPersistentStorage } from './store/db.js';
 import { MemoryStore } from './store/memory.js';
 import { loadTextSource, pickTextFile, rememberFileId, forgetTextFile, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
-import { Recorder } from './recorder/recorder.js';
+import { viewRecord as recordView, closeRecorder, recorderPoke } from './ui/record-view.js';
 import { openMic } from './recorder/capture.js';
 import { S, U, stitchBlockers } from './recorder/state.js';
 import { DriveClient } from './drive/drive-api.js';
@@ -11,9 +11,8 @@ import { UploadQueue } from './drive/queue.js';
 import * as auth from './drive/auth.js';
 import { stitchPassage } from './stitch/stitch.js';
 import { gateReportMarkdown } from './stitch/gate.js';
-import { STITCH } from './config.js';
+import { STITCH, OLD, OLD_APPS } from './config.js';
 
-const OLD = { tracker: 'https://xwzn961.sharehtml.org/', recorder: 'https://h2bavvr.sharehtml.org/', reader: 'https://93fyr0c.sharehtml.org/', xref: 'https://ugz9yeu.sharehtml.org/', concordance: 'https://q97d9yl.sharehtml.org/' };
 const $ = (sel, root = document) => root.querySelector(sel);
 const h = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -22,7 +21,7 @@ const h = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
-let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE }, drive, queue, recorder = null;
+let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE }, drive, queue;
 const folderCache = new Map();
 
 async function init() {
@@ -32,13 +31,20 @@ async function init() {
   await reloadText();
   try { for (const [k, v] of JSON.parse(localStorage.getItem('kjv-site.driveFolders.v1') || '[]')) folderCache.set(k, v); } catch {}
   drive = new DriveClient({ getToken: auth.getToken, folderCache });
-  queue = new UploadQueue({ store, drive, onChange: () => { saveFolders(); if (route().name === 'drive') render(); renderDriveBadge(); } });
+  queue = new UploadQueue({ store, drive, onChange: () => { saveFolders(); if (route().name === 'drive') render(); if (route().name === 'record') recorderPoke(); renderDriveBadge(); } });
   auth.onAuthChange(() => { renderDriveBadge(); if (!text.loaded) reloadText().then(rerenderTextViews); });
   queue.recover().catch(() => {});
   window.addEventListener('online', () => queue.kick());
   window.addEventListener('hashchange', render);
   render(); renderDriveBadge();
 }
+/** Shared bar, second row: every older app, on every page (filled once; the header itself is in index.html). */
+function renderAppsNav() {
+  const nav = $('#apps-nav'); if (!nav || nav.childElementCount) return;
+  nav.append(h('span', { class: 'apps-label' }, 'Other apps:'),
+    ...OLD_APPS.map(([label, key]) => h('a', { href: OLD[key], target: '_blank', rel: 'noopener' }, label, h('span', { class: 'ext', 'aria-hidden': 'true' }, ' \u2197'), h('span', { class: 'sr-only' }, ' (opens in a new tab)'))));
+}
+renderAppsNav();
 // ---------- Verse text (Google Drive only) ----------
 let textLoading = null;
 /** Load (or re-check) the verse text from the offline cache or Drive. text keeps its identity so an open Recorder sees it. */
@@ -71,7 +77,7 @@ async function chooseTextFile(ev, { different = false } = {}) {
 function textActions() {
   const s = textStatus.status;
   if (text.loaded) return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev, { different: true }) }, 'Choose a different file'));
-  if (s === 'signed-out') return h('div', { class: 'row text-actions' }, h('a', { href: '#/drive' }, 'Go to the Drive tab to sign in'));
+  if (s === 'signed-out') return h('div', { class: 'row text-actions' }, h('button', { onclick: async ev => { ev.target.disabled = true; try { await auth.needToken(); await reloadText(); if (textStatus.status === 'choose') await chooseTextFile(); } catch (e) { textStatus = { ...textStatus, message: e.message }; } finally { rerenderTextViews(); } } }, 'Sign in to show the verse text'));
   if (s === 'choose' || s === 'invalid') return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev) }, MESSAGES.choose));
   if (s === 'error') return h('div', { class: 'row text-actions' }, h('button', { onclick: async () => { await reloadText(); rerenderTextViews(); } }, 'Try again'));
   return h('div', { class: 'row text-actions' });
@@ -92,10 +98,10 @@ async function renderDriveBadge() {
 
 async function render() {
   const r = route(), main = $('#main'); main.replaceChildren();
-  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href').startsWith('#/' + r.name)));
-  if (recorder && r.name !== 'record') { await recorder.close(); recorder = null; }
+  document.querySelectorAll('nav.tabs a').forEach(a => { const on = a.getAttribute('href').startsWith('#/' + r.name); a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (r.name !== 'record') await closeRecorder();
   try {
-    if (r.name === 'record') return await viewRecord(main, r.params.get('passage'));
+    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, queue, drive, text, auth, openMic, reloadText, chooseTextFile, textStatusLine, textStatus: () => textStatus });
     if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
     if (r.name === 'drive') return await viewDrive(main);
     return viewHome(main);
@@ -117,9 +123,6 @@ function viewHome(main) {
     h('section', { class: 'card' }, h('h2', {}, 'Stitch'), passageForm('stitch')),
     h('section', { class: 'card' }, h('h2', {}, 'Verse text'),
       h('p', { class: 'text-status' }, textStatusLine()), textActions()),
-    h('section', { class: 'older' }, h('h2', {}, 'Older pages (still live)'),
-    h('ul', {}, ...Object.entries({ 'Reading Tracker': OLD.tracker, 'Voice Recorder (old)': OLD.recorder, 'Rolling Reader': OLD.reader, 'Cross-references': OLD.xref, 'Concordance of Even': OLD.concordance })
-      .map(([k, v]) => h('li', {}, h('a', { href: v, target: '_blank', rel: 'noopener' }, k))))),
   );
 }
 
@@ -127,68 +130,11 @@ async function viewDrive(main) {
   const ups = (await store.allUploads()).sort((a, b) => b.updatedAt - a.updatedAt);
   const btn = h('button', { onclick: async () => { try { await auth.signIn(); await queue.resumeAfterSignIn(); render(); } catch (e) { alert(e.message); } } }, auth.isSignedIn() ? 'Sign in again' : 'Sign in with Google');
   main.append(h('h1', {}, 'Google Drive'),
-    h('p', { class: 'lead' }, 'Recordings are saved to "KJV Recordings" in your Drive. This site can only see files it saved itself (drive.file permission). Replaced takes are moved to a "_replaced" folder, never deleted.'),
+    h('p', { class: 'lead' }, 'Recordings are saved to "KJV Recordings" in your Drive. This site can only see files it saved itself (drive.file permission). There is one file per verse: recording a verse again overwrites its old file.'),
     h('div', { class: 'row' }, btn, auth.isSignedIn() ? h('button', { onclick: () => { auth.signOut(); render(); } }, 'Sign out') : null,
       h('button', { onclick: async () => { for (const u of await store.allUploads()) if (u.state === U.UPLOAD_FAILED) await store.putUpload({ ...u, nextAt: 0 }); queue.kick(); } }, 'Retry failed uploads')),
     h('div', { class: 'table-wrap' }, h('table', {}, h('tr', {}, h('th', {}, 'Verse'), h('th', {}, 'Take'), h('th', {}, 'Upload'), h('th', {}, 'Note')),
       ...ups.map(u => h('tr', {}, h('td', {}, refOf(u.verseId)), h('td', {}, u.takeNo), h('td', { class: 'st-' + u.state }, u.state), h('td', {}, u.error || ''))))));
-}
-
-// ---------- Recorder view ----------
-async function viewRecord(main, passage) {
-  if (!passage) { main.append(h('h1', {}, 'Record'), passageForm('record')); return; }
-  const p = parsePassage(passage);
-  if (recorder && recorder.passage !== formatPassage(p)) { await recorder.close(); recorder = null; }
-  if (!recorder) recorder = await new Recorder({ passage: p, store, queue, openMic, textSource: text, onUpdate: () => paint() }).load();
-  const rec = recorder;
-  const title = h('h1', {}), verseRef = h('div', { class: 'ref' }), verseText = h('div', { class: 'verse' }), status = h('div', { class: 'status' });
-  const msg = h('div', { class: 'msg' }), controls = h('div', { class: 'row big' }), reviewBox = h('div', {}), list = h('ol', { class: 'verses' });
-  main.append(title, h('section', { class: 'card reading' }, verseRef, verseText, text.loaded ? h('div', {}) : textActions()), h('section', { class: 'card controls' }, status, msg, controls, reviewBox), h('h2', {}, 'Verses'), list,
-    h('p', {}, h('a', { href: `#/stitch?passage=${encodeURIComponent(rec.passage)}` }, 'Go to StitchBot for this passage')));
-
-  async function paint() {
-    if (recorder !== rec) return;
-    title.textContent = `Record ${rec.passage}`;
-    verseRef.textContent = refOf(rec.verseId);
-    verseText.textContent = text.text(rec.verseId) ?? (text.loaded ? '(No text for this verse.)' : textStatusLine());
-    status.textContent = ({ IDLE: 'Ready', ARMING: 'Listening to the room…', ARMED: 'Speak now', RECORDING: 'Recording… tap Stop when done', PROCESSING: 'Processing…', REVIEW: 'Listen back, then Accept or Re-record', FAILED_CHECK: 'This take failed a check. Please re-record.', SAVING: 'Saving…', SAVED: 'Saved', SKIPPED: 'Skipped', MIC_DENIED: 'Microphone blocked', MIC_LOST: 'Microphone lost', NO_SPEECH: 'No speech heard', STORAGE_FULL: 'Storage full' })[rec.state] || rec.state;
-    status.className = 'status s-' + rec.state;
-    msg.textContent = rec.message || '';
-    const b = (label, fn, cls = '') => h('button', { class: cls, onclick: fn }, label);
-    controls.replaceChildren(...({
-      ARMING: [b('Cancel', () => rec.cancel())],
-      ARMED: [b('Start now', () => rec.tapStart(), 'rec'), b('Cancel', () => rec.cancel())],
-      RECORDING: [b('Stop', () => rec.stop(), 'stop')],
-      REVIEW: [b('Accept', () => rec.accept(), 'ok'), b('Re-record', () => rec.record()), b('Skip', () => rec.skip())],
-      FAILED_CHECK: [b('Re-record', () => rec.record(), 'rec'), b('Skip', () => rec.skip())],
-      STORAGE_FULL: [b('Try saving again', () => rec.accept())],
-      PROCESSING: [], SAVING: [],
-    }[rec.state] || [b(rec.state === S.SAVED || rec.statuses[rec.verseId] === S.SAVED ? 'Re-record this verse' : 'Record', () => rec.record(), 'rec'), b('Skip', () => rec.skip())]));
-    reviewBox.replaceChildren();
-    if (rec.review && (rec.state === S.REVIEW || rec.state === S.FAILED_CHECK)) {
-      const url = URL.createObjectURL(new Blob([rec.review.wav], { type: 'audio/wav' }));
-      const bad = Object.entries(rec.review.checks).filter(([, c]) => c.status === 'FAIL' || c.status === 'WARN');
-      reviewBox.append(h('audio', { controls: true, src: url }), drawWave(rec.review.wav),
-        h('ul', { class: 'checks' }, ...(bad.length ? bad.map(([k, c]) => h('li', { class: 'c-' + c.status }, `${k}: ${c.status} (${c.value})`)) : [h('li', { class: 'c-PASS' }, 'All checks passed')])));
-    }
-    const ups = await store.allUploads().catch(() => []);
-    const upBy = {}; for (const u of ups) { const t = await store.getTake(u.takeId); if (t && t.status === 'accepted') upBy[u.verseId] = u.state; }
-    list.replaceChildren(...rec.ids.map((id, i) => h('li', { class: (i === rec.index ? 'cur ' : '') + 'v-' + (rec.statuses[id] || 'NONE') },
-      h('button', { class: 'link', onclick: () => { try { rec.select(i); } catch (e) { rec.message = e.message; paint(); } } }, refOf(id)),
-      ' ', rec.statuses[id] || '', upBy[id] ? ` · Drive ${upBy[id]}` : '')));
-  }
-  paint();
-}
-
-function drawWave(wavBuf) {
-  const c = h('canvas', { width: 600, height: 80, class: 'wave' }); const g = c.getContext('2d');
-  const dv = new DataView(wavBuf); const n = (wavBuf.byteLength - 44) >> 1; g.fillStyle = '#356';
-  for (let x = 0; x < 600; x++) {
-    let mx = 0; const s = Math.floor(x * n / 600), e = Math.floor((x + 1) * n / 600);
-    for (let i = s; i < e; i += 8) mx = Math.max(mx, Math.abs(dv.getInt16(44 + i * 2, true)) / 32768);
-    g.fillRect(x, 40 - mx * 40, 1, Math.max(1, mx * 80));
-  }
-  return c;
 }
 
 // ---------- StitchBot view ----------

@@ -1,14 +1,10 @@
-# data/ (local only, gitignored)
+# data/ (empty on purpose)
 
-Put a local verse-text file here as `data/kjv-text.json` if you want the site to load it
-automatically when served from this folder. Everything in this folder except this README
-is gitignored and must never be pushed.
+This folder holds no verse text, on this computer, in the repo or on the live site.
 
-Accepted formats:
+The site loads its verse text only from a JSON file in the signed-in user's own Google Drive, chosen once with the
+Google Picker. It then keeps a checked copy in the browser's IndexedDB for offline use. See "No Bible text or audio
+in this repo" in the top-level README.
 
-- `{ "verses": [ { "id": "GEN.1.1", "read_aloud_text": "..." } ] }` (the CrossWire export format)
-- `[ { "id": "GEN.1.1", "text": "..." } ]`
-- `{ "GEN.1.1": "..." }`
-
-On the live site, use the **Text** page instead. It loads a file from your device into that
-browser's storage only.
+Everything in this folder except this README is gitignored. `scripts/check-no-kjv-text.py` scans this folder too
+and fails if any KJV text turns up here.

@@ -74,7 +74,7 @@ test('gate: case-variant duplicate file fails', async () => {
 test('gate: fake text source drives the duration check', async () => {
   const wav = makeVerseWav(); const dur = (wav.byteLength - 44) / 2 / SR;
   const words = Math.round((dur - 0.4) * 2.5), fake = Array.from({ length: words }, (_, i) => 'sample' + i).join(' ');
-  const ts = TextSource.fromJson({ 'GEN.3.14': fake });
+  const ts = TextSource.fromJson({ verses: [{ id: 'GEN.3.14', read_aloud_text: fake }] });
   eq((await runGate('Genesis 3:14', new Map([['Genesis 3-14.wav', wav]]), { textSource: ts })).verses[0].checks.duration.status, 'PASS');
 });
 

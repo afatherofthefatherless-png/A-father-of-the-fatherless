@@ -34,9 +34,16 @@ test('browser: app.js boots without errors and never writes tracker keys', async
   const f = document.createElement('iframe'); f.src = '../index.html#/home'; document.body.append(f);
   await new Promise(r => f.onload = r); await new Promise(r => setTimeout(r, 800));
   ok(f.contentDocument.querySelector('#main h1'), 'home view rendered'); eq(f.contentWindow.__bootError || null, null);
+  eq(f.contentDocument.querySelector('.text-status').textContent, 'Google API key not set up yet', 'Home and Record show the same text status');
+  ok(!/null/.test(f.contentDocument.querySelector('#main').textContent), 'no stray "null" in Home');
   f.contentWindow.location.hash = '#/record?passage=Psalm%2023%3A1-3'; await new Promise(r => setTimeout(r, 600));
   eq(f.contentDocument.querySelector('#main h1').textContent, 'Record Psalm 23:1-3');
-  ok(/not loaded/.test(f.contentDocument.querySelector('.verse').textContent), 'placeholder when no text');
+  eq(f.contentDocument.querySelector('.verse').textContent, 'Google API key not set up yet', 'plain message while GOOGLE_API_KEY is empty and nothing is cached');
+  eq(f.contentDocument.querySelector('input[type=file]'), null, 'no file input on Record');
+  eq([...f.contentDocument.querySelectorAll('nav a')].map(a => a.textContent).join(), 'Home,Record,Stitch,Drive');
+  f.contentWindow.location.hash = '#/text'; await new Promise(r => setTimeout(r, 400));
+  eq(f.contentDocument.querySelector('#main h1').textContent, 'KJV reading site', '#/text falls back to Home');
+  eq(f.contentDocument.querySelector('input[type=file]'), null, 'no file input anywhere');
   f.contentWindow.location.hash = '#/stitch?passage=Genesis%203%3A14-15'; await new Promise(r => setTimeout(r, 600));
   ok(/Not recorded yet/.test(f.contentDocument.querySelector('#main').textContent));
   eq(Object.keys(localStorage).filter(k => k.startsWith('bible-coverage-tracker')).sort().join(), before);

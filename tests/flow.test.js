@@ -101,7 +101,7 @@ test('recorder: fake text source gives word counts for the duration check', asyn
   const store = new MemoryStore(), mic = fakeMic();
   const rec = await new Recorder({ passage: 'Genesis 3:14', store, openMic: mic.open, textSource: ts }).load();
   await readVerse(rec, mic, 1); ok(rec.review.checks.duration.status !== 'SKIP');
-  eq(TextSource.fromJson([{ id: 'GEN.1.1', text: 'Sample verse one.' }]).wordCount('GEN.1.1'), 3);
+  eq(TextSource.fromJson([{ id: 'GEN.1.1', text: 'Sample verse one.' }]).loaded, false, 'only the CrossWire slim shape is accepted');
 });
 
 // ---------- hashes ----------

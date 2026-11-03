@@ -2,7 +2,7 @@
 import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, passageStem } from './kjv/ref.js';
 import { Store, requestPersistentStorage } from './store/db.js';
 import { MemoryStore } from './store/memory.js';
-import { loadTextSource, saveTextFile, TextSource } from './kjv/text-source.js';
+import { loadTextSource, pickTextFile, rememberFileId, forgetTextFile, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
 import { Recorder } from './recorder/recorder.js';
 import { openMic } from './recorder/capture.js';
 import { S, U, stitchBlockers } from './recorder/state.js';
@@ -22,22 +22,61 @@ const h = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
-let store, text = new TextSource(), drive, queue, recorder = null;
+let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE }, drive, queue, recorder = null;
 const folderCache = new Map();
 
 async function init() {
   try { store = new Store(); await store.getKv('ping'); } catch { store = new MemoryStore(); }
   requestPersistentStorage();
-  text = await loadTextSource(store);
+  store.setKv('textSource', null).catch(() => {}); // forget any file picked under the old Text page
+  await reloadText();
   try { for (const [k, v] of JSON.parse(localStorage.getItem('kjv-site.driveFolders.v1') || '[]')) folderCache.set(k, v); } catch {}
   drive = new DriveClient({ getToken: auth.getToken, folderCache });
   queue = new UploadQueue({ store, drive, onChange: () => { saveFolders(); if (route().name === 'drive') render(); renderDriveBadge(); } });
-  auth.onAuthChange(() => renderDriveBadge());
+  auth.onAuthChange(() => { renderDriveBadge(); if (!text.loaded) reloadText().then(rerenderTextViews); });
   queue.recover().catch(() => {});
   window.addEventListener('online', () => queue.kick());
   window.addEventListener('hashchange', render);
   render(); renderDriveBadge();
 }
+// ---------- Verse text (Google Drive only) ----------
+let textLoading = null;
+/** Load (or re-check) the verse text from the offline cache or Drive. text keeps its identity so an open Recorder sees it. */
+function reloadText() {
+  if (textLoading) return textLoading;
+  textLoading = (async () => {
+    const r = await loadTextSource({ store, getToken: auth.getToken });
+    text.replaceWith(r.source); textStatus = r;
+  })().finally(() => { textLoading = null; });
+  return textLoading;
+}
+function rerenderTextViews() { const n = route().name; if (n === 'home' || n === 'record') render(); }
+/** One status line, shared by Home and Record. */
+function textStatusLine() {
+  if (textLoading && !text.loaded) return MESSAGES.loading;
+  return text.loaded ? `CrossWire KJV text loaded from Google Drive (${text.map.size} verses).` : (textStatus.message || MISSING_MESSAGE);
+}
+async function chooseTextFile(ev, { different = false } = {}) {
+  const btn = ev && ev.target; if (btn) btn.disabled = true;
+  try {
+    if (different) { await forgetTextFile({ store }); text.replaceWith(new TextSource()); await reloadText(); }
+    const token = auth.getToken();
+    if (!token) { await reloadText(); return; }
+    const id = await pickTextFile({ token });
+    if (id) { rememberFileId(id); textStatus = { status: 'loading', message: MESSAGES.loading }; rerenderTextViews(); await reloadText(); }
+  } catch (e) { textStatus = { ...textStatus, message: e.message }; }
+  finally { if (btn) btn.disabled = false; rerenderTextViews(); }
+}
+/** Buttons that go with the status line (same on Home and Record). */
+function textActions() {
+  const s = textStatus.status;
+  if (text.loaded) return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev, { different: true }) }, 'Choose a different file'));
+  if (s === 'signed-out') return h('div', { class: 'row text-actions' }, h('a', { href: '#/drive' }, 'Go to the Drive tab to sign in'));
+  if (s === 'choose' || s === 'invalid') return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev) }, MESSAGES.choose));
+  if (s === 'error') return h('div', { class: 'row text-actions' }, h('button', { onclick: async () => { await reloadText(); rerenderTextViews(); } }, 'Try again'));
+  return h('div', { class: 'row text-actions' });
+}
+
 function saveFolders() { try { localStorage.setItem('kjv-site.driveFolders.v1', JSON.stringify([...folderCache])); } catch {} }
 
 function route() {
@@ -58,7 +97,6 @@ async function render() {
   try {
     if (r.name === 'record') return await viewRecord(main, r.params.get('passage'));
     if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
-    if (r.name === 'text') return viewText(main);
     if (r.name === 'drive') return await viewDrive(main);
     return viewHome(main);
   } catch (e) { main.append(h('p', { class: 'err' }, e.message)); }
@@ -78,23 +116,11 @@ function viewHome(main) {
     h('h2', {}, 'Record'), passageForm('record'),
     h('h2', {}, 'Stitch'), passageForm('stitch'),
     h('h2', {}, 'Verse text'),
-    h('p', {}, text.loaded ? `Loaded on this device: ${text.label} (${text.map.size} verses).` : 'No verse text is loaded on this device yet. ', h('a', { href: '#/text' }, 'Load text')),
+    h('p', { class: 'text-status' }, textStatusLine()), textActions(),
     h('h2', {}, 'Older pages (still live)'),
     h('ul', {}, ...Object.entries({ 'Reading Tracker': OLD.tracker, 'Voice Recorder (old)': OLD.recorder, 'Rolling Reader': OLD.reader, 'Cross-references': OLD.xref, 'Concordance of Even': OLD.concordance })
       .map(([k, v]) => h('li', {}, h('a', { href: v, target: '_blank', rel: 'noopener' }, k)))),
   );
-}
-
-function viewText(main) {
-  const file = h('input', { type: 'file', accept: '.json,application/json' });
-  const msg = h('p', {});
-  file.addEventListener('change', async () => {
-    try { text = await saveTextFile(store, file.files[0]); msg.textContent = `Loaded ${text.map.size} verses from ${text.label}. It stays on this device only.`; }
-    catch (e) { msg.textContent = `Could not load: ${e.message}`; }
-  });
-  main.append(h('h1', {}, 'Verse text'),
-    h('p', {}, 'This site does not include any Bible text. Pick a JSON file of verses on this device (for example the CrossWire export). It is kept in this browser only and never uploaded.'),
-    h('p', {}, 'Current: ', text.loaded ? `${text.label} (${text.map.size} verses)` : 'none'), file, msg);
 }
 
 async function viewDrive(main) {
@@ -117,14 +143,14 @@ async function viewRecord(main, passage) {
   const rec = recorder;
   const title = h('h1', {}), verseRef = h('div', { class: 'ref' }), verseText = h('div', { class: 'verse' }), status = h('div', { class: 'status' });
   const msg = h('div', { class: 'msg' }), controls = h('div', { class: 'row big' }), reviewBox = h('div', {}), list = h('ol', { class: 'verses' });
-  main.append(title, verseRef, verseText, status, msg, controls, reviewBox, h('h2', {}, 'Verses'), list,
+  main.append(title, verseRef, verseText, text.loaded ? h('div', {}) : textActions(), status, msg, controls, reviewBox, h('h2', {}, 'Verses'), list,
     h('p', {}, h('a', { href: `#/stitch?passage=${encodeURIComponent(rec.passage)}` }, 'Go to StitchBot for this passage')));
 
   async function paint() {
     if (recorder !== rec) return;
     title.textContent = `Record ${rec.passage}`;
     verseRef.textContent = refOf(rec.verseId);
-    verseText.textContent = text.text(rec.verseId) ?? '(Verse text not loaded on this device. Load it under "Text".)';
+    verseText.textContent = text.text(rec.verseId) ?? (text.loaded ? '(No text for this verse.)' : textStatusLine());
     status.textContent = ({ IDLE: 'Ready', ARMING: 'Listening to the room…', ARMED: 'Speak now', RECORDING: 'Recording… tap Stop when done', PROCESSING: 'Processing…', REVIEW: 'Listen back, then Accept or Re-record', FAILED_CHECK: 'This take failed a check. Please re-record.', SAVING: 'Saving…', SAVED: 'Saved', SKIPPED: 'Skipped', MIC_DENIED: 'Microphone blocked', MIC_LOST: 'Microphone lost', NO_SPEECH: 'No speech heard', STORAGE_FULL: 'Storage full' })[rec.state] || rec.state;
     status.className = 'status s-' + rec.state;
     msg.textContent = rec.message || '';

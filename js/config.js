@@ -5,6 +5,11 @@ export const SAMPLE_RATE = 48000;          // one rate everywhere (capture, file
 export const BIT_DEPTH = 16;               // per-verse WAV: mono, 16-bit PCM, 48 kHz
 
 export const GOOGLE_CLIENT_ID = '456053541349-mqe47qb198sts80j0oqkrqof1ep5gtb0.apps.googleusercontent.com';
+// Google Picker (choosing the verse-text file in Drive). The browser API key is public by design but restricted to
+// the GitHub Pages referrer and the Picker + Drive APIs. Empty until Robin creates it; the site then says
+// "Google API key not set up yet". The app id is the Cloud project number (the client id's numeric prefix).
+export const GOOGLE_API_KEY = 'AIzaSyAJhoFJTyoEIMx00CmQRKVe7uOPD-lOhUQ';
+export const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split('-')[0]; // '456053541349'
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'; // narrowest scope; the only one requested
 export const DRIVE_ROOT_FOLDER = 'KJV Recordings';
 export const DRIVE_REPLACED_FOLDER = '_replaced'; // old takes are moved here, never deleted

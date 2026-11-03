@@ -1,0 +1,12 @@
+# Verse text is loaded at runtime and is NEVER committed.
+data/*
+!data/README.md
+# No recordings or rendered media in the repo.
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.mov
+*.webm
+node_modules/
+.DS_Store

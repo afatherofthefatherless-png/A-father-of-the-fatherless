@@ -1,0 +1,23 @@
+:root { --fg:#1d2430; --muted:#5b6575; --ok:#1d7a3a; --warn:#a36a00; --bad:#b3261e; --accent:#2b5c8a; }
+* { box-sizing: border-box; }
+body { margin:0; font: 18px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background:#fafaf7; }
+header { display:flex; justify-content:space-between; align-items:center; padding:.5rem 1rem; background:#fff; border-bottom:1px solid #ddd; position:sticky; top:0; }
+nav a { margin-right:1rem; color: var(--accent); text-decoration:none; } nav a.on { font-weight:700; }
+#drive-badge { color: var(--muted); font-size:.85rem; }
+main { max-width: 760px; margin: 0 auto; padding: 1rem; }
+.row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.5rem 0; }
+input[type=text] { font-size:1rem; padding:.5rem; min-width: 16rem; }
+button { font-size:1rem; padding:.55rem 1rem; border-radius:8px; border:1px solid #bbb; background:#fff; cursor:pointer; }
+.big button { font-size:1.25rem; padding:.9rem 1.6rem; }
+button.rec { background:#b3261e; color:#fff; border-color:#b3261e; } button.stop { background:#333; color:#fff; } button.ok { background:var(--ok); color:#fff; border-color:var(--ok); }
+button.link { border:0; background:none; color:var(--accent); padding:0; text-decoration:underline; font-size:1rem; }
+.ref { font-size:1.6rem; font-weight:700; margin-top:.5rem; } .verse { font-size:1.35rem; margin:.5rem 0 1rem; }
+.status { font-weight:600; } .s-RECORDING { color: var(--bad); } .s-ARMED { color: var(--ok); }
+.msg, .err { color: var(--bad); }
+.checks { padding-left:1.2rem; } .c-PASS { color:var(--ok);} .c-WARN { color:var(--warn);} .c-FAIL { color:var(--bad);}
+.verses li.cur { font-weight:700; } .v-SAVED { color: var(--ok); } .v-SKIPPED { color: var(--warn); }
+.wave { width:100%; height:80px; display:block; margin:.5rem 0; background:#eef1f4; }
+.report { white-space:pre-wrap; background:#fff; border:1px solid #ddd; padding:.5rem; font-size:.85rem; }
+a.dl { display:inline-block; margin:.25rem .75rem .25rem 0; }
+table { border-collapse:collapse; width:100%; } td, th { border-bottom:1px solid #e3e3e3; padding:.3rem; text-align:left; }
+.st-UPLOADED { color: var(--ok); } .st-UPLOAD_FAILED, .st-AUTH_EXPIRED { color: var(--bad); }

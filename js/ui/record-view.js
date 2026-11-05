@@ -3,6 +3,7 @@
 // "3. Your audio" with Send to Rolling Reader / Download WAV / Save or share), inside the shared site bar.
 // Changed from the old page: recording is per verse (Record / Stop / Send), each verse is its own WAV on Drive,
 // card 2 runs StitchBot by itself when the last verse is sent, and a "Passages to record" list comes from the tracker.
+// Card 1 shows the passage text box (with A-/A+ and verse numbers) ABOVE the Record / Send / Re-record buttons.
 import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, parseId } from '../kjv/ref.js';
 import { BOOKS } from '../kjv/books.js';
 import { VerseRecorder, V } from '../recorder/verse-flow.js';
@@ -107,7 +108,7 @@ export async function viewRecord(main, ctx) {
   const ptBox = h('div', { class: 'ptbox', role: 'region', 'aria-labelledby': 'ptRef' }, h('div', { class: 'pthead' }, ptRef, ptMeta),
     h('div', { class: 'ptctl' }, h('label', { class: 'check' }, ptNumsBox, ' Show verse numbers'), h('span', { class: 'ptsize' }, ptSmaller, ptBigger)), ptText);
   wrap.append(h('section', { class: 'card', 'aria-labelledby': 'h-pass' }, h('h2', { id: 'h-pass' }, h('label', { for: 'passage', style: 'display:inline;min-height:0;margin:0' }, 'Passage')),
-    pick, form, pstatus, p ? ptBox : null));
+    pick, form, pstatus));
   if (perr) say(perr, true); else if (p) say(`${label} · ${R.ids.length} verse${R.ids.length === 1 ? '' : 's'} · one file per verse, e.g. ${fileNameOf(R.ids[0])}`);
   else say('Tap a passage in your list, pick from the Bible, or type one (spaces, colons and short names all work: "Gen 1 1-5").');
 
@@ -155,7 +156,8 @@ export async function viewRecord(main, ctx) {
   sendBtn.addEventListener('click', async () => { await R.send(); if (R.complete) pipe && pipe.run({ force: true }); else pipe && pipe.refresh(); });
   wrap.append(h('section', { class: 'card', 'aria-labelledby': 'h-in' }, h('h2', { id: 'h-in' }, '1. Your reading'),
     h('p', { class: 'readtitle' }, rtRef, rtFile),
-    h('div', { class: 'btnrow' }, recBtn, sendBtn, reBtn), inStatus, inWarn, review,
+    ptBox, // Robin: the verse text sits ABOVE the Record / Send / Re-record buttons, in the same card
+    h('div', { class: 'btnrow recrow' }, recBtn, sendBtn, reBtn), inStatus, inWarn, review,
     h('details', { class: 'vlist', open: R.ids.length <= 12 }, h('summary', {}, 'Verses'), verses)));
 
   // ---------- 2. Make the clean version (runs by itself) ----------

@@ -52,6 +52,12 @@ test('browser: app.js boots without errors and never writes tracker keys', async
   eq(f.contentWindow.getComputedStyle(d.body).fontFamily.split(',')[0].replace(/["']/g, ''), 'OpenDyslexic');
   eq($('.readtitle strong').textContent, 'Psalm 23:1'); ok(/Psalm 23-1\.wav/.test($('.readtitle span').textContent), 'hyphen file name shown');
   eq([...d.querySelectorAll('.tt h2')].map(x => x.textContent).join('|'), 'Passages to record|Passage|1. Your reading|2. Make the clean version|3. Your audio');
+  { const pt = $('.pttext'), rb = $('button.rec'), sb = $('button.send');
+    ok(pt && rb && (pt.compareDocumentPosition(rb) & Node.DOCUMENT_POSITION_FOLLOWING), 'verse text comes before the Record button in DOM order');
+    ok(pt.compareDocumentPosition(sb) & Node.DOCUMENT_POSITION_FOLLOWING, 'verse text comes before Send');
+    eq(pt.closest('section'), rb.closest('section'), 'verse text and Record button are in the same card (1. Your reading)');
+    ok($('.ptbox').contains($('#ptNums')) && $('.ptbox').querySelectorAll('.ptsize button').length === 2, 'A-/A+ and verse-number toggle stay with the verse text');
+    ok(pt.getBoundingClientRect().top < rb.getBoundingClientRect().top, 'verse text is drawn above the Record button'); }
   const lines = [...d.querySelectorAll('.steps.pipeline li')];
   eq(lines.map(l => l.dataset.s).join(), 'captured,drive,gate,stitched,queued,rendered,mp4');
   ok(/waiting for renderer/.test(lines[5].textContent) && /waiting for renderer/.test(lines[6].textContent), 'MP4 stages honest');

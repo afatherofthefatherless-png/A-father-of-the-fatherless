@@ -97,3 +97,10 @@
 .tt .steps li.st-warn { color: #ffd98a; } .tt .steps li.st-warn::before { content: '!'; }
 .tt .steps li.st-bad { color: #ffb3b3; font-weight: 700; } .tt .steps li.st-bad::before { content: '\2717'; }
 .tt .steps li.st-wait { color: #bcd6ff; } .tt .steps li.st-wait::before { content: '\23F8'; }
+
+/* --- verse text above the Record controls (card 1): text first, then Record / Send / Re-record.
+   Height capped so the text box and the Record button fit on one screen together. --- */
+.tt .card .ptbox { margin: 0 0 14px; }
+.tt .card .ptbox .pttext { max-height: 28vh; }
+@media (min-width: 640px) { .tt .card .ptbox .pttext { max-height: 38vh; } }
+@media (min-width: 640px) and (max-height: 900px) { .tt .card .ptbox .pttext { max-height: 30vh; } }

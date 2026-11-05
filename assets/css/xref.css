@@ -1,0 +1,28 @@
+/* Cross Ref Map page: same look as the rest of the site (black, white 2px borders, Rolling Reader tinted panel for the link box). */
+main.wide { max-width: 1400px; }
+.xr-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.xr-top .card { margin: 0; padding: 12px 14px; }
+.xr-top h2 { margin-bottom: 4px; }
+.xr-stats, .xr-src, .xr-help, .xr-credit, .xr-meta, .xr-note { margin: 2px 0 6px; font-size: .85em; }
+.xr-help, .xr-credit, .xr-meta { color: var(--muted); }
+.xr-note:empty { display: none; }
+.xr-note { background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok-fg); border-radius: 10px; padding: 6px 10px; }
+.xr-sl { display: block; font-size: .85em; font-weight: 700; }
+.xr-sl input { display: block; width: 100%; min-height: 44px; accent-color: #fff; }
+#xr-count { display: block; font-weight: 700; font-size: 1.05em; }
+.xr-top .row { margin: 6px 0; gap: 8px; }
+.xr-top button { min-height: 44px; padding: 6px 12px; font-size: .9rem; }
+.xr-box .ref { font-size: 1.1em; }
+.xr-text { max-height: 9.5em; overflow: auto; }
+.xr-text .verse { font-size: 1.05rem; line-height: 1.6; }
+.xr-map { position: relative; margin: 12px 0 0; height: max(420px, calc(100vh - 330px)); border: 2px solid #fff; border-radius: 14px; overflow: hidden; background: #000; touch-action: manipulation; }
+.xr-map canvas { position: absolute; inset: 0; display: block; }
+.xr-over { cursor: pointer; }
+.xr-ruler { position: absolute; left: 0; top: 0; bottom: 0; border-right: 2px solid #fff; }
+.xr-tick { position: absolute; left: 0; right: 0; min-height: 0; min-width: 0; padding: 0 6px 0 10px; border: 0; border-radius: 0; background: transparent;
+  border-top: 1px solid #555; color: #fff; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; }
+.xr-tick::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--g); }
+.xr-tick.tiny { font-size: 0; }
+.xr-tick:active, .xr-tick:focus-visible { background: #333; }
+@media (orientation: portrait) { .xr-map { height: max(480px, calc(100vh - 560px)); } }
+@media (max-width: 760px) { .xr-top { grid-template-columns: 1fr; } .xr-map { height: 70vh; } }

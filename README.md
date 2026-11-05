@@ -142,3 +142,12 @@ These are not settings in the app.
     scripts/check-no-kjv-text.py
 
 Live test site: https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/
+
+### Cross Ref Map animations (release 8)
+Canvas has two layers: static arcs on the base canvas (drawn in batches, capped at 60,000), and everything that moves on an overlay canvas:
+1. Yellow (#ffe81f) dots travel source→target on the top 400 arcs in view; size and speed scale with votes.
+2. Slider moves: new arcs draw in over 0.4 s, dropped arcs fade over 0.2 s; more than 3,000 changed arcs → jump.
+3. Soft yellow glow pulses every 2 s on the top 200 arcs.
+4. First load: a wave reveals Genesis→Revelation over 1.5 s; aborted to the final state after 3 frames slower than 50 ms.
+5. Hover (mouse) / tap (touch): nearest arc found through a grid spatial index (`ArcIndex`), others dim, both verse refs labelled, 0.15 s fade.
+`prefers-reduced-motion: reduce` turns all of it off (Play button disabled, changes jump). Test-only emulation: `?motion=reduce` on localhost.

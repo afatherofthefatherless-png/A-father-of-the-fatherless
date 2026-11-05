@@ -5,4 +5,5 @@ import './gate-stitch.test.js';
 import './flow.test.js';
 import './text-source.test.js';
 import './rebase.test.js';
+import './xref.test.js';
 export { runAll } from './lib.js';

@@ -8,5 +8,5 @@
   await import('./browser.test.js');
   const r = await runAll(log);
   window.__result = r;
-  try { await fetch('/__result', { method: 'POST', body: JSON.stringify({ ...r, log: out.textContent }) }); } catch {}
+  try { await fetch('/__result', { method: 'POST', body: JSON.stringify({ ...r, log: out.textContent, perf: window.__xrefPerf || '' }) }); } catch {}
 </script>

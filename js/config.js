@@ -65,7 +65,7 @@ export const OLD = Object.freeze({
   tracker: 'https://xwzn961.sharehtml.org/',      // Reading Tracker
   recorder: 'https://h2bavvr.sharehtml.org/',     // King James Bible Voice Recorder
   reader: 'https://93fyr0c.sharehtml.org/',       // Rolling Reader
-  xref: 'https://ugz9yeu.sharehtml.org/',         // Cross-references (arc diagram)
+  xref: '#/xref',                                  // Cross-references: the new Cross Ref Map page in this site (old arc diagram was https://ugz9yeu.sharehtml.org/)
   concordance: 'https://q97d9yl.sharehtml.org/',  // Concordance of Even
 });
 export const OLD_APPS = Object.freeze([

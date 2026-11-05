@@ -121,3 +121,6 @@ I found nothing that is undocumented. Two limits apply:
 - The "Same rules, new code" rows rest on comparing behaviour and names with the old files. The commit history does
   not record any copying.
 - I checked the old apps' function names in their latest saved copies on this computer, not in their live versions.
+
+### Cross Ref Map animations (new in release 8)
+All new: two-layer canvas, dots, draw-in/fade, glow pulse, first-load wave with frame-time abort, hover/tap highlight, `ArcIndex` grid spatial index (js/xref/xrefs.js), reduced-motion handling. Ported from the arc prototype: only the half-ellipse arc idea and the ruler-of-books layout.

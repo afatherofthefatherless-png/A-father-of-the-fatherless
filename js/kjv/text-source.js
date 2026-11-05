@@ -162,19 +162,19 @@ async function loadPicker(env) {
  * under drive.file. Resolves to the picked file id, or null if the user cancels. Rejects if the key is missing.
  * env is injectable for tests: { gapi, google, loadScript }.
  */
-export async function pickTextFile({ token, apiKey = GOOGLE_API_KEY, appId = GOOGLE_APP_ID, env = {} } = {}) {
+export async function pickTextFile({ token, apiKey = GOOGLE_API_KEY, appId = GOOGLE_APP_ID, env = {}, mimeTypes = TEXT_MIME, title = 'Choose the verse text file' } = {}) {
   if (!apiKey) throw new Error(MESSAGES.noKey);
   if (!token) throw new Error(MESSAGES.signedOut);
   const e = { gapi: env.gapi ?? (env.loadScript ? undefined : globalThis.gapi), google: env.google, loadScript: env.loadScript || loadScript };
   const picker = await loadPicker(e);
   return new Promise(res => {
-    const view = new picker.DocsView(picker.ViewId.DOCS).setMimeTypes(TEXT_MIME).setIncludeFolders(true).setSelectFolderEnabled(false);
+    const view = new picker.DocsView(picker.ViewId.DOCS).setMimeTypes(mimeTypes).setIncludeFolders(true).setSelectFolderEnabled(false);
     const p = new picker.PickerBuilder()
       .addView(view)
       .setOAuthToken(token)
       .setDeveloperKey(apiKey)
       .setAppId(appId)
-      .setTitle('Choose the verse text file')
+      .setTitle(title)
       .setCallback(data => {
         const action = data[picker.Response.ACTION];
         if (action === picker.Action.PICKED) { const d = (data[picker.Response.DOCUMENTS] || [])[0]; res(d ? d[picker.Document.ID] : null); }

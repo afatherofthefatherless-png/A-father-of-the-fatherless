@@ -4,6 +4,7 @@ import { Store, requestPersistentStorage } from './store/db.js';
 import { MemoryStore } from './store/memory.js';
 import { loadTextSource, pickTextFile, rememberFileId, forgetTextFile, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
 import { viewRecord as recordView, closeRecorder, recorderPoke } from './ui/record-view.js';
+import { viewXref, closeXref } from './ui/xref-view.js';
 import { openMic } from './recorder/capture.js';
 import { S, U, stitchBlockers } from './recorder/state.js';
 import { DriveClient } from './drive/drive-api.js';
@@ -42,7 +43,7 @@ async function init() {
 function renderAppsNav() {
   const nav = $('#apps-nav'); if (!nav || nav.childElementCount) return;
   nav.append(h('span', { class: 'apps-label' }, 'Other apps:'),
-    ...OLD_APPS.map(([label, key]) => h('a', { href: OLD[key], target: '_blank', rel: 'noopener' }, label, h('span', { class: 'ext', 'aria-hidden': 'true' }, ' \u2197'), h('span', { class: 'sr-only' }, ' (opens in a new tab)'))));
+    ...OLD_APPS.map(([label, key]) => OLD[key].startsWith('#') ? h('a', { href: OLD[key] }, label) : h('a', { href: OLD[key], target: '_blank', rel: 'noopener' }, label, h('span', { class: 'ext', 'aria-hidden': 'true' }, ' \u2197'), h('span', { class: 'sr-only' }, ' (opens in a new tab)'))));
 }
 renderAppsNav();
 // ---------- Verse text (Google Drive only) ----------
@@ -52,11 +53,11 @@ function reloadText() {
   if (textLoading) return textLoading;
   textLoading = (async () => {
     const r = await loadTextSource({ store, getToken: auth.getToken });
-    text.replaceWith(r.source); textStatus = r;
+    text.replaceWith(r.source); textStatus = r; try { window.dispatchEvent(new Event('kjv-text-changed')); } catch {}
   })().finally(() => { textLoading = null; });
   return textLoading;
 }
-function rerenderTextViews() { const n = route().name; if (n === 'home' || n === 'record') render(); }
+function rerenderTextViews() { const n = route().name; if (n === 'home' || n === 'record') render(); else if (n === 'xref') window.dispatchEvent(new Event('kjv-text-changed')); }
 /** One status line, shared by Home and Record. */
 function textStatusLine() {
   if (textLoading && !text.loaded) return MESSAGES.loading;
@@ -100,10 +101,12 @@ async function render() {
   const r = route(), main = $('#main'); main.replaceChildren();
   document.querySelectorAll('nav.tabs a').forEach(a => { const on = a.getAttribute('href').startsWith('#/' + r.name); a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   if (r.name !== 'record') await closeRecorder();
+  if (r.name !== 'xref') closeXref();
   try {
     if (r.name === 'record') return await recordView(main, { h, params: r.params, store, queue, drive, text, auth, openMic, reloadText, chooseTextFile, textStatusLine, textStatus: () => textStatus });
     if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
     if (r.name === 'drive') return await viewDrive(main);
+    if (r.name === 'xref') return await viewXref(main, { h, store, auth, text, textStatusLine, textActions });
     return viewHome(main);
   } catch (e) { main.append(h('p', { class: 'err' }, e.message)); }
 }

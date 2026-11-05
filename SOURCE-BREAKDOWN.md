@@ -13,11 +13,11 @@ No code was copied line for line. Everything is ES modules now, and the old apps
 
 ## The text: CrossWire KJV, the only source
 
-- All verse text comes from the CrossWire SWORD KJV module (v3.1, 31,102 verses).
-- It is loaded at run time from a JSON file in your own Google Drive. You choose the file once with the Google Picker,
-  and the site keeps a checked copy in the browser for offline use (`js/kjv/text-source.js`).
-- The repo has **no verse text**, and `scripts/check-no-kjv-text.py` fails the build if any shows up.
-- `js/kjv/books.js` holds only book names, codes and the verse counts for each chapter, generated from CrossWire.
+- All verse text comes from the CrossWire SWORD KJV module (v3.1, 31,102 verses), `read_aloud_text` of the local export.
+- Release 11: hosted in the repo as `data/kjv-crosswire.json` (sha256-pinned) and loaded by `js/data/repo-data.js`
+  (manifest, WebCrypto check, IndexedDB cache). The OpenBible.info cross-references (CC-BY) are hosted unchanged next to it.
+  The Drive/Picker text and refs loader written in releases 5–10 was removed.
+- `scripts/check-no-kjv-text.py` fails if Bible text shows up anywhere else.
 
 ## 1. King James Voice Recorder (old page `transcript-tidier.html`, h2bavvr.sharehtml.org)
 
@@ -123,4 +123,4 @@ I found nothing that is undocumented. Two limits apply:
 - I checked the old apps' function names in their latest saved copies on this computer, not in their live versions.
 
 ### Cross Ref Map animations (new in release 8)
-All new: two-layer canvas, dots, draw-in/fade, glow pulse, first-load wave with frame-time abort, hover/tap highlight, `ArcIndex` grid spatial index (js/xref/xrefs.js), reduced-motion handling. Ported from the arc prototype: only the half-ellipse arc idea and the ruler-of-books layout.
+All new: two-layer canvas, dots, draw-in/fade, glow pulse, first-load wave with frame-time abort, hover/tap highlight, `ArcIndex` grid spatial index (js/xref/xrefs.js), reduced-motion handling, vertical scrolling map (Genesis to Revelation, touch pan, ruler scrolls with arcs, viewport-only drawing via `arcVisible`, index queried in content coordinates), side list of the refs in view ranked by votes (`refsInRange`), OpenBible file-info note (`fileInfo`), share-prep text box (no send route), compact landscape layout. Release 10: long map (page scroll, sticky canvases, height = max(4 x old height, 1.5 x width)), two scrollable verse boxes in Link of the Day (Drive KJV text only), no rank/votes in the box, Save for later removed, Drive status at the bottom of the page. Ported from the arc prototype: only the half-ellipse arc idea and the ruler-of-books layout.

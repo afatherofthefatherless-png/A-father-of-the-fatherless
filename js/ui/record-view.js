@@ -112,21 +112,15 @@ export async function viewRecord(main, ctx) {
   if (perr) say(perr, true); else if (p) say(`${label} · ${R.ids.length} verse${R.ids.length === 1 ? '' : 's'} · one file per verse, e.g. ${fileNameOf(R.ids[0])}`);
   else say('Tap a passage in your list, pick from the Bible, or type one (spaces, colons and short names all work: "Gen 1 1-5").');
 
-  /** Lazy sign-in: only when verse text is really needed (from a tap), then remembered for this tab. */
-  async function signInForText(ev) {
-    const b = ev && ev.target; if (b) b.disabled = true;
-    try { await auth.needToken(); await ctx.reloadText(); if (ctx.textStatus().status === 'choose') await ctx.chooseTextFile(); }
-    catch (e) { ptMsg(e.message); } finally { if (b) b.disabled = false; recorderPoke(); }
-  }
   function ptMsg(m, actions = []) { ptText.replaceChildren(h('p', { class: 'ptmsg' }, m), ...actions); }
+  let paintedLoaded = false;
   function paintText() {
+    paintedLoaded = text.loaded;
     if (!p) return;
-    ptRef.textContent = label; ptMeta.textContent = `${R.ids.length} verse${R.ids.length === 1 ? '' : 's'} · King James Version (from your Google Drive)`;
+    ptRef.textContent = label; ptMeta.textContent = `${R.ids.length} verse${R.ids.length === 1 ? '' : 's'} · King James Version (CrossWire KJV)`;
     if (!text.loaded) {
       const s = ctx.textStatus().status, acts = [];
-      if (s === 'signed-out') acts.push(h('button', { type: 'button', onclick: signInForText }, 'Sign in to show the verse text'));
-      else if (s === 'choose' || s === 'invalid') acts.push(h('button', { type: 'button', onclick: ev => ctx.chooseTextFile(ev).then(recorderPoke) }, 'Choose the verse text file from Google Drive'));
-      else if (s === 'error') acts.push(h('button', { type: 'button', onclick: async () => { await ctx.reloadText(); recorderPoke(); } }, 'Try again'));
+      if (s === 'error') acts.push(h('button', { type: 'button', onclick: async () => { await ctx.reloadText(); recorderPoke(); } }, 'Try again'));
       ptMsg(ctx.textStatusLine(), acts.length ? [h('div', { class: 'btnrow' }, ...acts)] : []);
       return;
     }
@@ -223,7 +217,7 @@ export async function viewRecord(main, ctx) {
     verses.replaceChildren(...R.ids.map((id, i) => h('li', { class: (i === R.index ? 'cur ' : '') + (R.statuses[id] === S.SAVED ? 'sent' : '') },
       h('button', { type: 'button', class: 'link', onclick: () => { try { R.select(i); } catch (e) { R.message = e.message; paint(); } } }, refOf(id)),
       h('span', { class: 'vst' }, R.statuses[id] === S.SAVED ? ` WAV captured · ${upWord(upBy[id])}` : i === R.index ? ' recording this one' : ' not sent yet'))));
-    if (lastIndex !== R.index) { lastIndex = R.index; paintText(); } else if (!text.loaded) paintText();
+    if (lastIndex !== R.index) { lastIndex = R.index; paintText(); } else if (!text.loaded || paintedLoaded !== text.loaded) paintText();
     // pipeline lines
     const lines = [['captured', P.stage.captured], ['drive', P.stage.drive], ['gate', P.stage.gate], ['stitched', P.stage.stitched], ['queued', P.stage.queued],
       ['rendered', { ...P.stage.rendered, text: 'MP4 rendered: ' + P.stage.rendered.text }], ['mp4', { ...P.stage.mp4, text: 'MP4 on Drive: ' + P.stage.mp4.text }]];

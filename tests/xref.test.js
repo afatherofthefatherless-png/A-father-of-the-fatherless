@@ -1,7 +1,8 @@
 // Cross Ref Map: parser, ranking, vote-threshold slider, id mapping, geometry, loader. Synthetic refs only, no verse text.
 import { test, eq, ok, deepEq, throws } from './lib.js';
 import * as X from '../js/xref/xrefs.js';
-import { loadRefs, devRefsUrl, saveLinkForLater, savedLinks, REFS_FILE_ID_KEY, REFS_CACHE_KEY } from '../js/xref/refs-source.js';
+import { loadRefs, devRefsUrl, REFS_FILE_NAME } from '../js/xref/refs-source.js';
+import { sha256Hex } from '../js/stitch/hash.js';
 import { MemoryStore } from '../js/store/memory.js';
 import { globalIndexOf } from '../js/kjv/ref.js';
 
@@ -51,20 +52,20 @@ test('xref: top-1000 pick, book lookup, arc geometry and hit test', () => {
   ok(Math.abs(pm.x - (90 + a.rx)) < 1e-6, 'mid point is the apex on the right');
   eq(X.hitTest(s, s.total, L, pm.x, pm.y), 0); eq(X.hitTest(s, s.total, L, 10, 10), -1);
 });
-test('xref: loader: signed out, choose, Drive download is cached, dev URL only on localhost', async () => {
-  const store = new MemoryStore(), ls = fakeLs();
-  eq((await loadRefs({ store, localStorage: ls })).status, 'signed-out');
-  eq((await loadRefs({ store, localStorage: ls, getToken: () => 't' })).status, 'choose');
-  ls.setItem(REFS_FILE_ID_KEY, 'F1'); const bytes = new TextEncoder().encode(SAMPLE);
-  const fetchImpl = async () => ({ ok: true, status: 200, arrayBuffer: async () => bytes.buffer.slice(0) });
-  const r = await loadRefs({ store, localStorage: ls, getToken: () => 't', fetchImpl });
-  eq(r.status, 'ok'); eq(r.set.total, 6); ok((await store.getKv(REFS_CACHE_KEY)).bytes, 'cached in the store');
-  eq((await loadRefs({ store, localStorage: ls })).from, 'Google Drive (saved on this device)', 'offline from cache');
+test('xref: loader: data/manifest.json -> data/openbible-cross-references.txt, cached, offline, bad checksum; dev URL only on localhost', async () => {
+  const store = new MemoryStore(), bytes = new TextEncoder().encode(SAMPLE);
+  const man = sha => new TextEncoder().encode(JSON.stringify({ files: { [REFS_FILE_NAME]: { bytes: bytes.length, sha256: sha } } }));
+  let online = true, files = { 'data/manifest.json': man(await sha256Hex(bytes)), ['data/' + REFS_FILE_NAME]: bytes };
+  const fetchImpl = async u => { if (!online) throw new TypeError('offline'); const b = files[u]; return b ? { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(0) } : { ok: false, status: 404 }; };
+  const r = await loadRefs({ store, fetchImpl });
+  eq(r.status, 'ok'); eq(r.set.total, 6); eq(r.from, 'this site');
+  online = false; eq((await loadRefs({ store, fetchImpl })).from, 'this site (saved on this device)', 'offline from cache');
+  online = true; files['data/manifest.json'] = man('b'.repeat(64));
+  const bad = await loadRefs({ store: new MemoryStore(), fetchImpl }); eq(bad.status, 'error'); ok(/Checksum mismatch/.test(bad.message));
+  eq(REFS_FILE_NAME, 'openbible-cross-references.txt');
   eq(devRefsUrl('?refs=tests/fixtures/x.txt', '127.0.0.1'), 'tests/fixtures/x.txt');
   eq(devRefsUrl('?refs=tests/fixtures/x.txt', 'afatherofthefatherless-png.github.io'), null);
   eq(devRefsUrl('?refs=https://evil.example/x', 'localhost'), null);
-  const l = X.linkAt(X.parseRefs(SAMPLE), 0); saveLinkForLater(l, ls); saveLinkForLater(l, ls);
-  eq(savedLinks(ls).length, 1); eq(savedLinks(ls)[0].label, 'Genesis 1:1 -> John 1:1-3');
 });
 test('xref: spatial index gives the same nearest arc as brute force', () => {
   let seed = 3; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -77,4 +78,21 @@ test('xref: spatial index gives the same nearest arc as brute force', () => {
     eq(b, a, `at ${x.toFixed(1)},${y.toFixed(1)}`); if (a >= 0) hits++;
   }
   ok(hits > 50, 'enough points near arcs: ' + hits);
+});
+
+test('xref: scrolling helpers: visible range, culling and range list follow the scroll offset', () => {
+  const s = X.parseRefs(SAMPLE), T = X.TOTAL_VERSES, H = 500, h = 4 * H - 16;
+  const L = { W: 800, H, sy: 0, x0: 90, maxW: 700, top: 8, h, y: g => 8 + (g + 0.5) / T * h - L.sy };
+  const [a0, b0] = X.visibleRange(L); eq(a0, 0); ok(b0 > 7000 && b0 < 8000, 'first screen ~ quarter of the Bible: ' + b0);
+  ok(X.arcVisible(s, 0, L), 'Gen 1:1 -> John 1 crosses screen 1');
+  const psRank = 1; L.sy = 3 * H; const [a1, b1] = X.visibleRange(L); ok(a1 > 20000 && b1 === T - 1, 'last screen reaches Revelation');
+  eq(X.arcVisible({ from: [0], to: [100], toEnd: [100] }, 0, L), false, 'a Genesis-only arc is off the last screen'); ok(X.arcVisible(s, psRank, L), 'Ps 23 -> John 10 reaches into it');
+  eq(X.refsInRange(s, s.total, a1, b1).map(r => X.linkAt(s, r).fromRef).join('|'), 'Genesis 1:1|Psalm 23:1|Genesis 1:1|3 John 1:14|Revelation 22:21', 'only links whose start or target is in range (not Gen -> Exod)');
+  L.sy = 0; deepEq(X.refsInRange(s, s.total, 0, 10, 2), [0, 2], 'ranked, max respected');
+  const fi = X.fileInfo(s); eq(fi.total, 6); eq(fi.starts, 4); eq(fi.maxV, 384); eq(fi.minV, -41);
+});
+test('xref: real file: 29,364 OSIS starting verses = 29,363 KJV verses (3 John 1:15 folds into 1:14)', async () => {
+  if (typeof process === 'undefined') return;
+  const fs = await import('node:fs'), p = '/workspace/xref/cross_references.txt'; if (!fs.existsSync(p)) return;
+  eq(X.fileInfo(X.parseRefs(fs.readFileSync(p, 'utf8'))).starts, 29363);
 });

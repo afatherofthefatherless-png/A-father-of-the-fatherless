@@ -13,16 +13,75 @@ main.wide { max-width: 1400px; }
 .xr-top .row { margin: 6px 0; gap: 8px; }
 .xr-top button { min-height: 44px; padding: 6px 12px; font-size: .9rem; }
 .xr-box .ref { font-size: 1.1em; }
-.xr-text { max-height: 9.5em; overflow: auto; }
+.xr-text { overflow: visible; }
 .xr-text .verse { font-size: 1.05rem; line-height: 1.6; }
-.xr-map { position: relative; margin: 12px 0 0; height: max(420px, calc(100vh - 330px)); border: 2px solid #fff; border-radius: 14px; overflow: hidden; background: #000; touch-action: manipulation; }
-.xr-map canvas { position: absolute; inset: 0; display: block; }
+.xr-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; margin: 8px 0 0; align-items: start; }
+.xr-map { position: relative; border: 2px solid #fff; border-radius: 14px; overflow: clip; background: #000; } /* height set by JS: tall A4-ish */
+/* long map: the page scrolls through it; canvases stay in view (sticky under the site header), ruler scrolls with the content */
+.xr-scroll, .xr-content { position: relative; height: 100%; }
+.xr-stick { position: sticky; top: var(--xr-hdr, 0px); }
+.xr-map canvas { position: absolute; left: 0; top: 0; display: block; touch-action: pan-y; }
+/* side list (Robin's sketch: scrollable strip right of the map) */
+.xr-side { margin: 0; padding: 10px 12px; display: flex; flex-direction: column; position: sticky; top: calc(var(--xr-hdr, 0px) + 6px); height: calc(100vh - var(--xr-hdr, 0px) - 12px); box-sizing: border-box; }
+.xr-list-h { margin: 0 0 6px; font-weight: 700; font-size: .85em; }
+.xr-list { list-style: none; margin: 0; padding: 0 4px 0 0; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.xr-list li { margin: 0 0 6px; }
+.xr-row { width: 100%; min-height: 44px; display: flex; gap: 8px; justify-content: space-between; align-items: center; text-align: left; padding: 6px 10px; font-size: .8rem; border: 1px solid #555; border-radius: 10px; background: #000; color: #fff; }
+.xr-row:hover, .xr-row:focus-visible { border-color: #fff; background: #222; }
+.xr-row.on { border-color: #ffe81f; color: #ffe81f; }
+.xr-row-v { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.xr-file { margin: 4px 0; font-size: .8em; background: #1d2a12; border: 1px solid #6b8f2a; border-radius: 10px; padding: 4px 10px; }
+.xr-file summary, .xr-prep summary { cursor: pointer; font-weight: 700; min-height: 32px; line-height: 32px; }
+.xr-file p { margin: 2px 0 6px; }
+.xr-prep { font-size: .8em; margin-top: 4px; }
+.xr-share { width: 100%; box-sizing: border-box; font: inherit; font-size: .95em; background: #000; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 6px; resize: vertical; }
 .xr-over { cursor: pointer; }
-.xr-ruler { position: absolute; left: 0; top: 0; bottom: 0; border-right: 2px solid #fff; }
+.xr-ruler { position: absolute; left: 0; top: 0; bottom: 0; border-right: 2px solid #fff; z-index: 2; background: #000; }
 .xr-tick { position: absolute; left: 0; right: 0; min-height: 0; min-width: 0; padding: 0 6px 0 10px; border: 0; border-radius: 0; background: transparent;
   border-top: 1px solid #555; color: #fff; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; }
 .xr-tick::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--g); }
 .xr-tick.tiny { font-size: 0; }
 .xr-tick:active, .xr-tick:focus-visible { background: #333; }
-@media (orientation: portrait) { .xr-map { height: max(480px, calc(100vh - 560px)); } }
-@media (max-width: 760px) { .xr-top { grid-template-columns: 1fr; } .xr-map { height: 70vh; } }
+.xr-ctl { display: flex; gap: 10px; align-items: flex-end; margin: 4px 0; } .xr-ctl .xr-sl { flex: 1; } .xr-ctl button { min-height: 44px; flex: none; }
+/* landscape (iPad): tighter top boxes so the map starts higher */
+@media (orientation: landscape) and (max-height: 900px) {
+  .xr-top .card { padding: 8px 12px; } .xr-top h2 { font-size: 1.05rem; margin-bottom: 2px; }
+  .xr-top { grid-template-columns: 1.15fr 1fr; }
+  
+  .xr-file { margin: 2px 0; padding: 0 10px; } .xr-file summary, .xr-prep summary { min-height: 26px; line-height: 26px; }
+
+  .xr-stats, .xr-src, .xr-credit, .xr-meta, .xr-note { margin: 1px 0 3px; font-size: .78em; }
+  .xr-sl span { display: none; } .xr-sl input { min-height: 34px; }
+  #xr-count { font-size: .9em; }
+  .xr-top .row { margin: 3px 0; } .xr-top button { min-height: 40px; padding: 4px 10px; font-size: .8rem; }
+  .xr-box .ref { font-size: 1em; margin: 0; } .xr-text .text-status { margin: 0 0 4px; }
+  .xr-text .row { margin: 2px 0; } .xr-text .verse { font-size: .95rem; line-height: 1.45; }
+}
+@media (orientation: portrait) { .xr-body { grid-template-columns: minmax(0, 1fr) 260px; } }
+@media (max-width: 760px) { .xr-top, .xr-body { grid-template-columns: 1fr; } .xr-side { position: static; height: 46vh; } }
+.xr-text:has(.text-status) { max-height: none; overflow: visible; }
+.xr-tick span { white-space: nowrap; }
+/* Link of the Day: two scrollable verse boxes (source, target); ephemeral, text only from the Drive KJV file */
+.xr-vboxes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0; }
+.xr-vbox { max-height: 7.5em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; border: 1px solid #555; border-radius: 8px; padding: 4px 8px; font-size: .85em; background: #000; }
+.xr-vbox[hidden] { display: none; }
+.xr-vbox:focus-visible { outline: 3px solid #ffe81f; }
+.xr-vh { margin: 0 0 2px; font-weight: 700; }
+.xr-vbox .verse { margin: 0 0 4px; font-size: .95rem; line-height: 1.45; }
+.xr-vbox .xr-meta { margin: 0; }
+.xr-text .text-status { font-size: .8em; margin: 2px 0; }
+.xr-text .row { margin: 2px 0; }
+/* compact top boxes everywhere */
+.xr-top .card { padding: 8px 12px; } .xr-top h2 { font-size: 1.05rem; margin-bottom: 2px; }
+.xr-box .ref { margin: 0; }
+.xr-meta:empty { display: none; }
+/* Drive status, sign-in and file picker help: bottom of the page */
+.xr-drive { margin: 12px 0 0; padding: 10px 14px; }
+.xr-drive h2 { font-size: 1.05rem; margin-bottom: 4px; }
+.xr-foot { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.xr-foot .xr-text { flex: 1 1 260px; } .xr-foot .xr-text .row, .xr-foot > .row { margin: 0; }
+.xr-text .text-status { font-size: .72em; line-height: 1.35; }
+.xr-vbox { min-height: 3em; }
+.xr-prep { margin-top: 2px; }
+.xr-top { align-items: start; }
+.xr-sl span { display: none; }

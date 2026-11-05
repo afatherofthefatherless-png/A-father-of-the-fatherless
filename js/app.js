@@ -2,7 +2,7 @@
 import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, passageStem } from './kjv/ref.js';
 import { Store, requestPersistentStorage } from './store/db.js';
 import { MemoryStore } from './store/memory.js';
-import { loadTextSource, pickTextFile, rememberFileId, forgetTextFile, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
+import { loadTextSource, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
 import { viewRecord as recordView, closeRecorder, recorderPoke } from './ui/record-view.js';
 import { viewXref, closeXref } from './ui/xref-view.js';
 import { openMic } from './recorder/capture.js';
@@ -28,12 +28,14 @@ const folderCache = new Map();
 async function init() {
   try { store = new Store(); await store.getKv('ping'); } catch { store = new MemoryStore(); }
   requestPersistentStorage();
-  store.setKv('textSource', null).catch(() => {}); // forget any file picked under the old Text page
-  await reloadText();
+  // Forget what the older releases kept (file ids and their cached copies); data now comes from data/.
+  for (const k of ['textSource', 'textCache.v1', 'refsCache.v1']) store.setKv(k, null).catch(() => {});
+  try { for (const k of ['kjv-site.textDriveFileId.v1', 'kjv-site.refsDriveFileId.v1']) localStorage.removeItem(k); } catch {}
+  reloadText().then(rerenderTextViews);   // not awaited: the page draws at once and shows "Loading the verse text…"
   try { for (const [k, v] of JSON.parse(localStorage.getItem('kjv-site.driveFolders.v1') || '[]')) folderCache.set(k, v); } catch {}
   drive = new DriveClient({ getToken: auth.getToken, folderCache });
   queue = new UploadQueue({ store, drive, onChange: () => { saveFolders(); if (route().name === 'drive') render(); if (route().name === 'record') recorderPoke(); renderDriveBadge(); } });
-  auth.onAuthChange(() => { renderDriveBadge(); if (!text.loaded) reloadText().then(rerenderTextViews); });
+  auth.onAuthChange(() => { renderDriveBadge(); });
   queue.recover().catch(() => {});
   window.addEventListener('online', () => queue.kick());
   window.addEventListener('hashchange', render);
@@ -46,40 +48,26 @@ function renderAppsNav() {
     ...OLD_APPS.map(([label, key]) => OLD[key].startsWith('#') ? h('a', { href: OLD[key] }, label) : h('a', { href: OLD[key], target: '_blank', rel: 'noopener' }, label, h('span', { class: 'ext', 'aria-hidden': 'true' }, ' \u2197'), h('span', { class: 'sr-only' }, ' (opens in a new tab)'))));
 }
 renderAppsNav();
-// ---------- Verse text (Google Drive only) ----------
+// ---------- Verse text (data/kjv-crosswire.json, served with the site) ----------
 let textLoading = null;
-/** Load (or re-check) the verse text from the offline cache or Drive. text keeps its identity so an open Recorder sees it. */
+/** Load (or re-check) the verse text from the checked IndexedDB copy or data/. text keeps its identity so an open Recorder sees it. */
 function reloadText() {
   if (textLoading) return textLoading;
   textLoading = (async () => {
-    const r = await loadTextSource({ store, getToken: auth.getToken });
+    const r = await loadTextSource({ store });
     text.replaceWith(r.source); textStatus = r; try { window.dispatchEvent(new Event('kjv-text-changed')); } catch {}
   })().finally(() => { textLoading = null; });
   return textLoading;
 }
-function rerenderTextViews() { const n = route().name; if (n === 'home' || n === 'record') render(); else if (n === 'xref') window.dispatchEvent(new Event('kjv-text-changed')); }
+function rerenderTextViews() { if (!store) return; const n = route().name; if (n === 'home') render(); else if (n === 'record') recorderPoke(); else if (n === 'xref') window.dispatchEvent(new Event('kjv-text-changed')); }
 /** One status line, shared by Home and Record. */
 function textStatusLine() {
   if (textLoading && !text.loaded) return MESSAGES.loading;
-  return text.loaded ? `CrossWire KJV text loaded from Google Drive (${text.map.size} verses).` : (textStatus.message || MISSING_MESSAGE);
-}
-async function chooseTextFile(ev, { different = false } = {}) {
-  const btn = ev && ev.target; if (btn) btn.disabled = true;
-  try {
-    if (different) { await forgetTextFile({ store }); text.replaceWith(new TextSource()); await reloadText(); }
-    const token = auth.getToken();
-    if (!token) { await reloadText(); return; }
-    const id = await pickTextFile({ token });
-    if (id) { rememberFileId(id); textStatus = { status: 'loading', message: MESSAGES.loading }; rerenderTextViews(); await reloadText(); }
-  } catch (e) { textStatus = { ...textStatus, message: e.message }; }
-  finally { if (btn) btn.disabled = false; rerenderTextViews(); }
+  return text.loaded ? `CrossWire KJV text loaded from ${text.label} (${text.map.size} verses).` : (textStatus.message || MISSING_MESSAGE);
 }
 /** Buttons that go with the status line (same on Home and Record). */
 function textActions() {
   const s = textStatus.status;
-  if (text.loaded) return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev, { different: true }) }, 'Choose a different file'));
-  if (s === 'signed-out') return h('div', { class: 'row text-actions' }, h('button', { onclick: async ev => { ev.target.disabled = true; try { await auth.needToken(); await reloadText(); if (textStatus.status === 'choose') await chooseTextFile(); } catch (e) { textStatus = { ...textStatus, message: e.message }; } finally { rerenderTextViews(); } } }, 'Sign in to show the verse text'));
-  if (s === 'choose' || s === 'invalid') return h('div', { class: 'row text-actions' }, h('button', { onclick: ev => chooseTextFile(ev) }, MESSAGES.choose));
   if (s === 'error') return h('div', { class: 'row text-actions' }, h('button', { onclick: async () => { await reloadText(); rerenderTextViews(); } }, 'Try again'));
   return h('div', { class: 'row text-actions' });
 }
@@ -103,10 +91,10 @@ async function render() {
   if (r.name !== 'record') await closeRecorder();
   if (r.name !== 'xref') closeXref();
   try {
-    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, queue, drive, text, auth, openMic, reloadText, chooseTextFile, textStatusLine, textStatus: () => textStatus });
+    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, queue, drive, text, auth, openMic, reloadText, textStatusLine, textStatus: () => textStatus });
     if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
     if (r.name === 'drive') return await viewDrive(main);
-    if (r.name === 'xref') return await viewXref(main, { h, store, auth, text, textStatusLine, textActions });
+    if (r.name === 'xref') return await viewXref(main, { h, store, text, textStatusLine, textActions });
     return viewHome(main);
   } catch (e) { main.append(h('p', { class: 'err' }, e.message)); }
 }

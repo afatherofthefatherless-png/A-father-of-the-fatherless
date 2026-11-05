@@ -1,10 +1,17 @@
-# Verse text is loaded at runtime and is NEVER committed.
+# data/: only these four files may be committed (scripts/check-no-kjv-text.py enforces it, kjv json sha256-pinned).
 data/*
+!data/kjv-crosswire.json
+!data/openbible-cross-references.txt
+!data/manifest.json
 !data/README.md
 # No recordings or rendered media in the repo.
 *.wav
 *.mp3
 *.m4a
+*.aac
+*.ogg
+*.opus
+*.flac
 *.mp4
 *.mov
 *.webm

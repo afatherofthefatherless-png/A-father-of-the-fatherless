@@ -12,43 +12,32 @@ It does three things:
 The old pages (Tracker, Voice Recorder, Rolling Reader, Cross-refs, Concordance) are linked from Home and are not changed.
 This pass doesn't touch the tracker's localStorage keys at all.
 
-## No Bible text or audio in this repo
+## Data in this repo (release 11)
 
-The repo and the deployed site contain **no KJV text and no audio**. They hold only book names, reference IDs and verse
-counts. Verse text comes from exactly one place: a JSON file in **your own Google Drive** (private, shared with no one),
-the CrossWire KJV export in slim form (`{ "verses": [ { "id", "read_aloud_text" } ] }`). There is no fixed path, no
-device file picker and no other fallback.
+The site now hosts its own data in `data/` (see `data/README.md`). No Google sign-in or Picker is used for text or refs.
 
-How the text loads (`js/kjv/text-source.js`):
+- `data/kjv-crosswire.json`: CrossWire KJV 3.1, 31,102 verses, `{ "verses": [ { "id", "read_aloud_text" } ] }`, 5,330,531 bytes,
+  sha256 `0641311b…c592` (pinned in `data/manifest.json`, `js/kjv/text-source.js` and the check script).
+- `data/openbible-cross-references.txt`: the OpenBible.info file, unchanged (8,303,003 bytes, 344,799 rows). **CC-BY, credit OpenBible.info.**
+- `data/manifest.json`: names, byte sizes, sha256 and counts. `data/README.md`: notes.
 
-1. Sign in with Google when you want the text: tap **Sign in to show the verse text** on Home or Record, or use the Drive tab
-   (GIS token model, `drive.file` scope only). Opening a page never forces a sign-in; Google's sign-in script only loads
-   when you tap. The token is kept for the browser session (`sessionStorage`), so you sign in once per session.
-2. The first time, Home and Record show **Choose the verse text file from Google Drive**. It opens the Google Picker,
-   limited to JSON files. Picking the file is what lets the site read it under `drive.file`.
-3. The site remembers the picked file id in `localStorage` (`kjv-site.textDriveFileId.v1`) and downloads it with
-   `files.get?alt=media` using the sign-in token.
-4. It checks the sha256 (`TEXT_SHA256`), that there are 31,102 verses, the shape, and that every id is a real verse.
-5. The checked file is cached in the site's IndexedDB, so it also works offline and signed out. The same checks run
-   again every time it is read from the cache.
+How it loads (`js/data/repo-data.js`): fetch `data/manifest.json` (relative URL, so it works under
+`/A-father-of-the-fatherless/` and on localhost), fetch the file, check its sha256 with WebCrypto, keep it in IndexedDB
+keyed by checksum. Reloads use the stored copy (works offline); a file downloads again only when the manifest checksum
+changes. A failed fetch or checksum shows a plain error with **Try again**.
 
-**Choose a different file** forgets the id and clears the cache. If the remembered file can't be opened (404 or 403),
-the site forgets it and shows the choose button again. If a file fails a check, the site says why and shows no text.
-Plain messages: "Google API key not set up yet" (while `GOOGLE_API_KEY` in `js/config.js` is empty) and
-"Not signed in to Google. Tap Sign in to show the verse text when you want it; you can record without it."
+Licensing of the hosted text (the CrossWire module says GPL) is Robin's decision. Geoblocking is not part of this build:
+GitHub Pages cannot geoblock, so it is left as a later decision.
 
-The Picker needs a browser API key (`GOOGLE_API_KEY`, restricted to the Pages referrer and the Picker and Drive APIs)
-and the app id `GOOGLE_APP_ID` (the project number, `456053541349`). The key is public by design, but it is only
-committed once Robin approves.
+Run this before every push:
 
-The tests use only fake text such as "Sample verse one." and synthetic audio. Run this before every push:
-
-    python3 scripts/check-no-kjv-text.py            # scans every file; exit 0 means clean
+    python3 scripts/check-no-kjv-text.py            # exit 0 means clean
     python3 scripts/check-no-kjv-text.py --self-test
 
-The check builds 8-word shingles from a **local** CrossWire export (default `/workspace/kjv-crosswire/kjv-crosswire-verses.json`,
-or set `--kjv`/`KJV_JSON`) and fails on any match. It also fails on any audio or video file, any embedded audio/video data URI, and any
-base64 run of 2000 or more characters.
+The check allows only the four `data/` files, with the kjv json (and refs file) locked to pinned sha256s. It fails on any
+other file in `data/`, a modified kjv/refs file, KJV text anywhere else (8-word shingles), audio/video files (by name or
+magic bytes), audio/video data URIs and base64 runs of 2000+ characters. `--self-test` copies the tree and proves it passes
+clean and fails on each of those. Tests use only fake text and synthetic audio.
 
 ## Recording a passage (Record tab)
 
@@ -151,3 +140,10 @@ Canvas has two layers: static arcs on the base canvas (drawn in batches, capped 
 4. First load: a wave reveals Genesis→Revelation over 1.5 s; aborted to the final state after 3 frames slower than 50 ms.
 5. Hover (mouse) / tap (touch): nearest arc found through a grid spatial index (`ArcIndex`), others dim, both verse refs labelled, 0.15 s fade.
 `prefers-reduced-motion: reduce` turns all of it off (Play button disabled, changes jump). Test-only emulation: `?motion=reduce` on localhost.
+
+## Cross-reference map (#/xref)
+The map scrolls from Genesis to Revelation (mouse, wheel or touch). The list on the right shows the links in view, ranked by votes. Hover or tap a row to highlight its arc and put it in Link of the Day. The info box has an OpenBible file-info note. The link box has a "Prepared for sharing" text box, but there is no send route yet. Only the visible part of the map is drawn.
+
+Release 10: the map is long (at least 4x the old one-screen height and at least 1.5x its width, so tall A4-ish proportions). You scroll the page itself down through it; the arcs and the side list stay in view. Link of the Day shows just the two refs, with a scrollable text box for each verse. The text comes only from your Drive KJV file; when it isn't loaded, the usual sign-in message shows. The box no longer shows rank or votes, and Save for later is gone. Drive load status and the file picker help are at the bottom of the page.
+
+Release 11: the verse text and the cross-references come from this site's `data/` folder (checked against `data/manifest.json`, kept on the device for offline use). No sign-in or file picker on the map; the bottom box is now "Data status".

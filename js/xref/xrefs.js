@@ -161,4 +161,32 @@ export class ArcIndex {
     return best;
   }
 }
+// ---------- Scrolling map helpers (L.sy = scroll offset in px; L.y already subtracts it) ----------
+/** Global verse indices [g0, g1] covered by the viewport (0..L.H px) at the current scroll offset. */
+export function visibleRange(L) {
+  const at = y => Math.max(0, Math.min(TOTAL_VERSES - 1, Math.round((y + L.sy - L.top) / L.h * TOTAL_VERSES - 0.5)));
+  return [at(0), at(L.H)];
+}
+/** Does arc r cross the viewport vertically? (cheap cull: its y-span overlaps 0..L.H) */
+export function arcVisible(set, r, L, pad = 2) {
+  const y1 = L.y(set.from[r]), y2 = L.y((set.to[r] + set.toEnd[r]) / 2);
+  return Math.max(y1, y2) >= -pad && Math.min(y1, y2) <= L.H + pad;
+}
+/** Up to max ranks (< n, highest votes first) whose start or target verse lies in [g0, g1]. */
+export function refsInRange(set, n, g0, g1, max = 150) {
+  const out = []; if (!set) return out;
+  for (let r = 0; r < Math.min(n, set.total) && out.length < max; r++) {
+    const f = set.from[r], t = set.to[r];
+    if ((f >= g0 && f <= g1) || (t >= g0 && t <= g1)) out.push(r);
+  }
+  return out;
+}
+/** Facts about the loaded file for the "OpenBible cross-references text file info" note. */
+export function fileInfo(set) {
+  if (!set) return null;
+  if (!set._info) { const seen = new Uint8Array(TOTAL_VERSES + 1); let starts = 0;
+    for (let i = 0; i < set.total; i++) { const f = set.from[i]; if (!seen[f]) { seen[f] = 1; starts++; } }
+    set._info = { total: set.total, skipped: set.skipped || 0, starts, maxV: set.total ? set.votes[0] : 0, minV: set.total ? set.votes[set.total - 1] : 0 }; }
+  return set._info;
+}
 export { TOTAL_VERSES };

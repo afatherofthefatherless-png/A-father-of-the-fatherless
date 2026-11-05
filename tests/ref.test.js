@@ -5,11 +5,9 @@ import * as R from '../js/kjv/ref.js';
 test('ref: 66 books, 31,102 verses', () => { eq(BOOKS.length, 66); eq(TOTAL_VERSES, 31102); });
 test('ref: id -> ref/stem/file name, Genesis 3:14', () => {
   eq(R.refOf('GEN.3.14'), 'Genesis 3:14'); eq(R.stemOf('GEN.3.14'), 'Genesis 3-14'); eq(R.fileNameOf('GEN.3.14'), 'Genesis 3-14.wav');
-  deepEq(R.folderPathOf('GEN.3.14'), ['KJV Recordings', '01 Genesis', 'Genesis 3']);
 });
 test('ref: Psalm singular in refs and files, Psalms in book folder', () => {
   eq(R.refOf('PSA.23.1'), 'Psalm 23:1'); eq(R.fileNameOf('PSA.23.1'), 'Psalm 23-1.wav');
-  deepEq(R.folderPathOf('PSA.23.1'), ['KJV Recordings', '19 Psalms', 'Psalm 23']);
   eq(R.parseFileName('Psalm 23-1.wav'), 'PSA.23.1'); eq(R.parseFileName('Psalms 23-1.wav'), null);
 });
 test('ref: file name round trip for all 31,102 verses, all unique', () => {

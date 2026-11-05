@@ -85,7 +85,7 @@ held the verified KJV text.
 **No code in the repo came from Biblia Dyslexia.** Its decisions shaped the behaviour:
 - Record one verse at a time.
 - A retake overwrites the old file, so there is one file per verse.
-- Clips go to Google Drive after a one-time Google sign-in, and you are told when sign-in has expired.
+- Clips went to Google Drive after a one-time Google sign-in (followed until release 11; release 12 saves to the device instead).
 - The text is the verified KJV, which here is CrossWire.
 
 **Not extracted yet:** the planned reader display (OpenDyslexic font and other settings), the study tools, and the
@@ -98,22 +98,20 @@ site uses `Genesis 3-14.wav` in `KJV Recordings`, as set out in PLAN.md.
 
 | File | What it does |
 |---|---|
-| `index.html`, `js/app.js` | The site shell, the tabs (Home, Record, Stitch, Drive) and the "Other apps" bar linking the five old apps (new tab). |
+| `index.html`, `js/app.js` | The site shell, the tabs (Home, Record, Stitch, Cross refs) and the "Other apps" bar linking the five old apps (new tab). |
 | `assets/css/site.css`, `assets/fonts/` | The look, restyled to match the old apps: OpenDyslexic (the same woff2 files Rolling Reader, the Reading Tracker, the Voice Recorder and Cross-references embed; OFL 1.1), black page, white 2px borders and tabs from the Reading Tracker, buttons and inputs from the Voice Recorder, the verse panel and notice colours from Rolling Reader, and the bordered links and table headers from the Concordance of Even. |
-| `js/config.js` | Settings and constants: sample rate, gate limits, the 0.4 s gap, the Google client ID and API key (both public). |
-| `js/kjv/ref.js` (rest) | Verse ids, file names (`Genesis 3-14.wav`), Drive folder paths, and passage parsing and expansion. |
-| `js/kjv/text-source.js` | Loads the CrossWire text from your Drive through the Picker, checks it, and caches it. |
-| `js/drive/auth.js` | Google sign-in with the `drive.file` permission only. The token is kept in memory and in `sessionStorage` for this tab, so you sign in once per session. Sign-in only starts on a tap. |
-| `js/drive/drive-api.js` | Drive uploads, including resumable uploads for big files and md5 checks. A retake overwrites the verse file in place, and stitched files that get replaced move to `Stitched/_replaced`. |
-| `js/drive/queue.js` | The upload queue, with retry and backoff and a pause when sign-in has expired. |
+| `js/config.js` | Settings and constants: sample rate, gate limits, the 0.4 s gap. (Release 12: no Google client ID or API key.) |
+| `js/kjv/ref.js` (rest) | Verse ids, file names (`Genesis 3-14.wav`) and passage parsing and expansion. |
+| `js/kjv/text-source.js` | Loads the CrossWire text from `data/`, checks it, and caches it. |
+| `js/save/device-save.js` | New in release 12: saves a file to this device (a download link; the share sheet where the browser can share files), remembers what was saved per verse, and Save again. |
 | `js/stitch/gate.js` | The pass/fail checks before joining: missing verses, format, length, lead-in, clipping, noise, silence and loudness. |
 | `js/stitch/stitch.js` | StitchBot. It joins the verse WAVs with a 0.4 s gap and writes the passage WAV and `timings.json`. No StitchBot existed before. |
-| `js/recorder/pipeline.js` | Runs and reports the steps after the last Send: Drive save, gate, stitch, render-job JSON on Drive. The two MP4 steps are placeholders that say "waiting for renderer". |
+| `js/recorder/pipeline.js` | Runs and reports the steps after the last Send: saved to this device, gate, stitch (WAV + timings downloaded). The two MP4 steps are placeholders that say "waiting for renderer". |
 | `js/recorder/chunks.js` | Reads the tracker's passage list from the Record link, keeps it on the device, and picks the next one. |
 | `js/stitch/hash.js` | Makes the sha256 and md5 checksums. |
-| `js/store/db.js`, `js/store/memory.js` | Device storage (IndexedDB) for sessions, takes and uploads. |
+| `js/store/db.js`, `js/store/memory.js` | Device storage (IndexedDB) for sessions, takes (one per verse) and small settings. |
 | `scripts/check-no-kjv-text.py` | Guard that fails if Bible text or audio gets into the repo. |
-| `tests/*` | Node and headless-browser tests with synthetic audio and a mock Drive. They use no real voice and no Bible text. |
+| `tests/*` | Node and headless-browser tests with synthetic audio and a fake download. They use no real voice and no Bible text. |
 
 ## Provenance not recorded
 
@@ -124,3 +122,15 @@ I found nothing that is undocumented. Two limits apply:
 
 ### Cross Ref Map animations (new in release 8)
 All new: two-layer canvas, dots, draw-in/fade, glow pulse, first-load wave with frame-time abort, hover/tap highlight, `ArcIndex` grid spatial index (js/xref/xrefs.js), reduced-motion handling, vertical scrolling map (Genesis to Revelation, touch pan, ruler scrolls with arcs, viewport-only drawing via `arcVisible`, index queried in content coordinates), side list of the refs in view ranked by votes (`refsInRange`), OpenBible file-info note (`fileInfo`), share-prep text box (no send route), compact landscape layout. Release 10: long map (page scroll, sticky canvases, height = max(4 x old height, 1.5 x width)), two scrollable verse boxes in Link of the Day (Drive KJV text only), no rank/votes in the box, Save for later removed, Drive status at the bottom of the page. Ported from the arc prototype: only the half-ellipse arc idea and the ruler-of-books layout.
+
+
+## Release 12: standalone, record and save to your own device
+
+- Removed (all new code from earlier releases, nothing ported): `js/drive/` (GIS auth, Drive REST client, upload queue),
+  the Drive tab and badge, folder settings, the Google client id / API key / Drive constants in `js/config.js`,
+  `folderPathOf` in `js/kjv/ref.js`, the upload sub-machine in `js/recorder/state.js`, the 'uploads' IndexedDB store,
+  the render-job JSON in `js/reader/handoff.js` and `js/recorder/pipeline.js`.
+- New: `js/save/device-save.js`; the Record tab's Save again / Share or Save to Files buttons and per-verse saved status;
+  the pipeline's "saved" step and stitched download. A retake now deletes the verse's older takes on the device.
+- Unchanged: the state machine, onset detection, trims, gate and stitch; the old sharehtml apps (still the "Other apps"
+  links); the Rolling Reader hand-off (sharehtml Reader origin only).

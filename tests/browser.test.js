@@ -3,7 +3,7 @@ import { test, eq, ok, deepEq } from './lib.js';
 import { Store } from '../js/store/db.js';
 import { openMic } from '../js/recorder/capture.js';
 
-test('browser: IndexedDB store keeps every take; accept supersedes, never deletes', async () => {
+test('browser: IndexedDB store keeps one take per verse; a retake overwrites', async () => {
   const s = new Store('kjv-site-test-' + Date.now());
   const wav = new Uint8Array([1, 2, 3]).buffer;
   await s.putTake({ takeId: 'GEN.1.1#1', verseId: 'GEN.1.1', takeNo: 1, status: 'review', wav });
@@ -11,10 +11,9 @@ test('browser: IndexedDB store keeps every take; accept supersedes, never delete
   eq(await s.nextTakeNo('GEN.1.1'), 2);
   await s.putTake({ takeId: 'GEN.1.1#2', verseId: 'GEN.1.1', takeNo: 2, status: 'review', wav });
   await s.acceptTake('GEN.1.1#2');
-  deepEq((await s.takesFor('GEN.1.1')).map(t => t.status), ['superseded', 'accepted']);
+  deepEq((await s.takesFor('GEN.1.1')).map(t => [t.takeNo, t.status]), [[2, 'accepted']]);
   eq((await s.acceptedTake('GEN.1.1')).takeNo, 2);
   await s.saveSession({ passage: 'Genesis 1:1', statuses: { 'GEN.1.1': 'SAVED' } }); eq((await s.getSession('Genesis 1:1')).statuses['GEN.1.1'], 'SAVED');
-  await s.putUpload({ takeId: 'GEN.1.1#2', state: 'QUEUED' }); eq((await s.allUploads()).length, 1);
   await s.setKv('k', { a: 1 }); eq((await s.getKv('k')).a, 1);
 });
 test('browser: AudioWorklet capture delivers Float32 blocks from the (fake) microphone', async () => {
@@ -52,7 +51,9 @@ test('browser: app.js boots without errors and never writes tracker keys', async
   eq($('.pttext .ptmsg'), null, 'verse text shown, no not-loaded message');
   ok(d.querySelectorAll('.pttext .pv').length === 3 && /LORD/.test($('.pttext').textContent), 'Psalm 23:1-3 text from data/kjv-crosswire.json');
   eq([...d.querySelectorAll('.pttext button')].length, 0, 'no sign-in button for text');
-  eq(d.querySelector('script[src*="accounts.google.com"]'), null, 'opening the recorder does not start a Google sign-in');
+  eq(d.querySelector('script[src*="google"]'), null, 'no Google script on the recorder page');
+  eq(d.querySelector('#drive-badge'), null, 'no Drive badge');
+  ok(!/Google|Drive/.test(d.body.textContent), 'no Google or Drive wording on the recorder page');
   eq(f.contentWindow.getComputedStyle(d.body).fontFamily.split(',')[0].replace(/["']/g, ''), 'OpenDyslexic');
   eq($('.readtitle strong').textContent, 'Psalm 23:1'); ok(/Psalm 23-1\.wav/.test($('.readtitle span').textContent), 'hyphen file name shown');
   eq([...d.querySelectorAll('.tt h2')].map(x => x.textContent).join('|'), 'Passages to record|Passage|1. Your reading|2. Make the clean version|3. Your audio');
@@ -63,9 +64,9 @@ test('browser: app.js boots without errors and never writes tracker keys', async
     ok($('.ptbox').contains($('#ptNums')) && $('.ptbox').querySelectorAll('.ptsize button').length === 2, 'A-/A+ and verse-number toggle stay with the verse text');
     ok(pt.getBoundingClientRect().top < rb.getBoundingClientRect().top, 'verse text is drawn above the Record button'); }
   const lines = [...d.querySelectorAll('.steps.pipeline li')];
-  eq(lines.map(l => l.dataset.s).join(), 'captured,drive,gate,stitched,queued,rendered,mp4');
-  ok(/waiting for renderer/.test(lines[5].textContent) && /waiting for renderer/.test(lines[6].textContent), 'MP4 stages honest');
-  ok(lines[5].classList.contains('st-wait') && !d.querySelector('.steps li[data-s=mp4].st-done'), 'MP4 never shown as done');
+  eq(lines.map(l => l.dataset.s).join(), 'captured,saved,gate,stitched,rendered,mp4');
+  ok(/waiting for renderer/.test(lines[4].textContent) && /waiting for renderer/.test(lines[5].textContent), 'MP4 stages honest');
+  ok(lines[4].classList.contains('st-wait') && !d.querySelector('.steps li[data-s=mp4].st-done'), 'MP4 never shown as done');
   ok($('#result').hidden, 'card 3 hidden until stitched');
   const recBtn = $('button.rec'), sendBtn = $('button.send');
   eq(recBtn.textContent, 'Record'); ok(sendBtn.disabled, 'Send waits for a take');
@@ -85,7 +86,7 @@ test('browser: app.js boots without errors and never writes tracker keys', async
   eq($('#main h1').textContent, 'Record Genesis 3:16'); eq(d.querySelectorAll('.chunkol li').length, 3, 'list kept after tapping a chunk');
   ok(d.querySelector('.chunkol li.cur a[aria-current=true]'), 'current chunk marked');
   eq(d.querySelector('input[type=file]'), null, 'no file input on Record');
-  eq([...f.contentDocument.querySelectorAll('nav.tabs a')].map(a => a.textContent).join(), 'Home,Record,Stitch,Drive,Cross refs');
+  eq([...f.contentDocument.querySelectorAll('nav.tabs a')].map(a => a.textContent).join(), 'Home,Record,Stitch,Cross refs');
   f.contentWindow.location.hash = '#/text'; await new Promise(r => setTimeout(r, 400));
   eq(f.contentDocument.querySelector('#main h1').textContent, 'KJV reading site', '#/text falls back to Home');
   eq(f.contentDocument.querySelector('input[type=file]'), null, 'no file input anywhere');
@@ -119,8 +120,8 @@ test('browser: Cross Ref Map loads a synthetic refs file, slider sets minimum vo
   ok(!/not loaded/.test($('#xr-src-text').textContent) && $('#xr-src-text').textContent.length > 10 && $('#xr-tgt-text').textContent.length > 10, 'both verse boxes show text from data/kjv-crosswire.json');
   ok(!/Sign in/.test($('#xr-linkbox').textContent), 'no sign-in in the link box');
   eq($('#xr-save'), null, 'Save for later removed');
-  ok($('#xr-drive').compareDocumentPosition($('#xr-map')) & 2, 'status/help box is below the map');
-  ok(/Data status/.test($('#xr-drive').textContent) && /data\/manifest\.json/.test($('#xr-drive').textContent) && !/Google/.test($('#xr-drive').textContent) && $('#xr-drive').contains($('.xr-src')), 'data status at the bottom, no Google');
+  ok($('#xr-status').compareDocumentPosition($('#xr-map')) & 2, 'status/help box is below the map');
+  ok(/Data status/.test($('#xr-status').textContent) && /data\/manifest\.json/.test($('#xr-status').textContent) && !/Google/.test($('#xr-status').textContent) && $('#xr-status').contains($('.xr-src')), 'data status at the bottom, no Google');
   d.querySelector('.xr-tick[data-book="0"]').click(); ok(/^Genesis|→ .*Genesis/.test($('#xr-link-ref').textContent) || /Genesis/.test($('#xr-link-ref').textContent), 'ruler tap selects a Genesis link');
   // tap the selected arc's apex on the canvas
   const W = f.contentWindow, st = W.__xref.state(), L = W.__xref.layout();

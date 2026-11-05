@@ -1,4 +1,4 @@
-// sha256 via WebCrypto (browser and node >= 19), md5 in plain JS (Drive returns md5Checksum).
+// sha256 via WebCrypto (browser and node >= 19), md5 in plain JS (kept for file checks).
 export async function sha256Hex(buf) {
   const d = await globalThis.crypto.subtle.digest('SHA-256', buf instanceof ArrayBuffer ? buf : new Uint8Array(buf));
   return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');

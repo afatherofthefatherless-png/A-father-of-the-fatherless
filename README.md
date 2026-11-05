@@ -6,7 +6,7 @@ This is a static site: plain HTML and ES modules, with no build step and no depe
 It does three things:
 
 - **Record** a passage one verse at a time. The site arms the mic, starts on your voice (or a tap), and you Stop, review, then Accept or Re-record.
-- **Save** each accepted verse to Google Drive as `KJV Recordings/01 Genesis/Genesis 3/Genesis 3-14.wav` (mono, 16-bit, 48 kHz).
+- **Save** each accepted verse to your own device as `Genesis 3-14.wav` (mono, 16-bit, 48 kHz). Nothing is uploaded; the site talks to no Google service (release 12).
 - **StitchBot** runs the pass/fail gate, then joins the verses in order with a fixed gap. It outputs `Genesis 3-14 to 3-19.wav` and `Genesis 3-14 to 3-19.timings.json`.
 
 The old pages (Tracker, Voice Recorder, Rolling Reader, Cross-refs, Concordance) are linked from Home and are not changed.
@@ -48,17 +48,23 @@ The Record tab is rebuilt on the old Voice Recorder (`transcript-tidier.html`): 
    recorder shows that list, marks the next one **Record this one next**, and keeps it on this device
    (`kjv-site.trackerChunks.v1`). Tap a passage to open it. A passage that spans two books can't be one recording yet,
    and the list says so. Typing a passage (`gen 3 14-16`, `Ps 23`, `1 cor 13:4`) or **Pick from the Bible** is the fallback.
-2. **Record / Stop / Send**, one verse at a time. Record again replaces the take (before or after Send). Send keeps a
-   WAV per verse and queues it for Drive as `Book C-V.wav` (for example `Genesis 3-14.wav`). A resend overwrites the same Drive file.
-3. After the last verse, everything runs by itself and each step has its own line: WAV captured, saved to Drive, gate,
-   stitched (0.4 s gap), queued for the Rolling Reader (a `Render jobs/<passage>.render-job.json` file on Drive, holding
-   names, timings and file ids, never verse text), MP4 rendered, MP4 on Drive.
-4. **The MP4 renderer is not in this repo.** The last two lines always say "waiting for renderer". Until it exists, use
-   **Download WAV**, **Save or share**, or **Send to Rolling Reader** (which opens the old Reader; the old Reader only
-   accepts audio from the old recorder's address, so it will not take this file until the Reader is changed).
+2. **Record / Stop / Send**, one verse at a time. Record again replaces the take (before or after Send). Send saves the
+   verse to this device as `Book C-V.wav` (for example `Genesis 3-14.wav`): a download (on iPad Safari it lands in
+   Files › Downloads), or **Share or Save to Files** where the browser can share files. The take is also kept in this
+   browser's storage (IndexedDB), so **Save again** works later, also from the verse list. A retake overwrites: one take
+   and one file name per verse, no version suffixes. (If a file with that name is already in Downloads, the browser
+   itself may add "(1)"; the site can't control that.)
+3. After the last verse, everything runs by itself and each step has its own line: WAV captured, saved to this device,
+   gate, stitched (0.4 s gap; the stitched WAV and its timings download to this device), MP4 rendered, MP4 saved.
+4. **The MP4 renderer is not in this repo.** The last two lines always say "waiting for renderer… Only the audio
+   exists." Robin asked to "save the video", but there is no video yet, only audio. Use **Download WAV** or **Send to
+   Rolling Reader** (which opens the old Reader; it only accepts audio from the old recorder's address, so it will not
+   take this file until the Reader is changed).
 
-If you are not signed in when a verse is sent, the WAV stays on the device and the Drive line shows
-**Sign in to save to Drive**; after sign-in the queue continues.
+Release 12 removed: Google sign-in, Drive upload and its queue, the Drive tab and badge, folder settings, "waiting"
+counts, the GIS/Picker scripts, the client id and API key, and the render-job JSON (nothing read it). Old Drive-era
+keys (`kjv-site.driveFolders.v1`, the sign-in token in sessionStorage) are cleared on load; the old 'uploads' store
+in IndexedDB is deleted (DB version 2).
 
 ## Run locally
 
@@ -69,7 +75,7 @@ You need a mic, and the page must be served over http://localhost or https.
 ## Tests
 
     node tests/run.mjs                  # 88 tests, Node 18+
-    python3 tests/browser-run.py        # 91: the same 88 plus IndexedDB, AudioWorklet capture and app boot, in headless Chrome with a fake mic
+    python3 tests/browser-run.py        # 100 in headless Chrome with a fake mic (the shared tests plus IndexedDB, AudioWorklet capture, app boot and pages)
 
 The tests cover:
 
@@ -78,18 +84,17 @@ The tests cover:
 - Onset detection on synthetic speech-like bursts, with silence, noise, clicks, breaths and the Stop tap.
 - Every gate pass/fail case, stitch timings and gaps, and the state machine.
 - The Recorder driven by a fake mic.
-- The Drive client and upload queue, against a **mock** fetch.
-- The Drive text loader (Picker, download, checks, cache, forget), against mock fetch, gapi and Picker with fake text.
-- The rebuilt recorder: separate hyphen-named files per verse, Record again overwrites, Send queues an upload, the
-  automated pipeline and render-job JSON (mock Drive), tracker hand-off chunks and the next-passage choice, and the
+- Saving to the device: the download link name, Save again, a failed download (take kept, message shown), one take per verse.
+- A check that no Google or Drive code is left in `js/`.
+- The rebuilt recorder: separate hyphen-named files per verse, Record again overwrites, Send saves the verse to the device, the
+  automated pipeline (stitched WAV + timings downloaded), tracker hand-off chunks and the next-passage choice, and the
   Rolling Reader send's origin check.
-- In headless Chrome: opening Record does not load Google sign-in, the seven step lines (renderer lines say waiting),
+- In headless Chrome: no Google script, badge or wording on Record, the six step lines (renderer lines say waiting),
   the tracker passage list, and a Record → Stop run with the fake mic.
 
 ## Not tested yet
 
-- **Google Drive and the Google Picker against the real APIs.** It needs Robin's sign-in and the OAuth origin set up for the Pages URL. Only the
-  request logic has been checked, against a mock.
+- A real download / Share sheet on iPad Safari (only headless Chrome and emulated screen sizes were checked).
 - The MP4 renderer (not built) and the Rolling Reader accepting audio from the new site (needs a Reader change).
 - Real voice, real rooms, iPad/Safari (only emulated screen sizes were checked), Bluetooth mics, and a phone call or lock screen interrupting a recording.
 - The 44.1 kHz resample fallback (`OfflineAudioContext`), which only runs when the device won't open at 48 kHz.
@@ -106,26 +111,24 @@ These are not settings in the app.
 
 ## Rules the code follows
 
-- One file per verse on Drive. Recording a verse again overwrites its old file (`Genesis 3-14.wav`), with no version
-  suffixes. On the device, the old take is still kept locally (marked `superseded`). Stitched files that get replaced
-  still move to `Stitched/_replaced/` (unchanged).
-- Google sign-in uses the GIS token model with the `drive.file` scope only. There's a public client ID and **no client secret**.
-  The token (about 1 hour) is kept in memory and in `sessionStorage` for this tab only, never in `localStorage`.
+- One file per verse. Recording a verse again overwrites it (`Genesis 3-14.wav`), on the device too: only the
+  accepted take is kept in IndexedDB. No version suffixes.
+- Nothing is uploaded. No sign-in, no client id, no API key, no secrets.
 - Already-posted videos are not touched. v1 has no re-render or import features.
 
 ## Layout
 
     index.html  assets/css/site.css   (look copied from the old apps; see the comment at the top of site.css)
     assets/fonts/             OpenDyslexic 400/700 woff2 (same files the old apps embed) and OFL.txt (SIL OFL 1.1)
-    js/app.js                 router and views (#/record, #/stitch, #/drive)
+    js/app.js                 router and views (#/, #/record, #/stitch, #/xref; an old #/drive link falls back to Home)
     js/config.js              constants
-    js/kjv/                   books (counts only), ref/filename utilities, Drive text loader (Picker)
+    js/kjv/                   books (counts only), ref/filename utilities, verse text from data/
     js/recorder/              capture (AudioWorklet), onset, loudness, WAV, state machine, Recorder controller,
                               pipeline (steps after Send), chunks (tracker passage list)
     js/ui/record-view.js      the Record tab (old Voice Recorder layout); assets/css/recorder.css its styles
-    js/reader/handoff.js      Rolling Reader handoff and render-job contents
+    js/reader/handoff.js      Rolling Reader handoff (sharehtml Reader origin only)
     js/stitch/                gate, StitchBot, hashes
-    js/drive/                 GIS auth, Drive REST client, upload queue
+    js/save/device-save.js    save a file to this device (download link / share sheet), Save again
     js/store/                 IndexedDB store (plus an in-memory store for tests)
     tests/                    harness, synthetic audio, node and headless-Chrome runners
     scripts/check-no-kjv-text.py

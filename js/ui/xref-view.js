@@ -41,8 +41,8 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     h('div', { class: 'xr-ctl' }, h('label', { class: 'xr-sl' }, h('span', {}, 'Minimum votes: all, 5, 10, 20, 50, 100'), slider), playBtn), countEl,
     h('details', { class: 'xr-file', id: 'xr-file' }, h('summary', {}, 'OpenBible cross-references text file info'), fileEl),
     h('p', { class: 'xr-credit' }, 'Cross-references: ', h('a', { href: 'https://www.openbible.info/labs/cross-references/', target: '_blank', rel: 'noopener' }, 'OpenBible.info'), ' (CC-BY).'));
-  const drive = h('section', { class: 'card xr-drive', id: 'xr-drive', 'aria-labelledby': 'xr-drive-h' },
-    h('h2', { id: 'xr-drive-h' }, 'Data status'), srcEl, actions,
+  const status = h('section', { class: 'card xr-status', id: 'xr-status', 'aria-labelledby': 'xr-status-h' },
+    h('h2', { id: 'xr-status-h' }, 'Data status'), srcEl, actions,
     h('p', { class: 'xr-help' }, 'Scroll down the page through the map from Genesis to Revelation. Tap an arc, a book, or a row in the list to put that link in the box.'),
     h('p', { class: 'xr-credit' }, 'Verse text: CrossWire KJV (data/kjv-crosswire.json). Cross-references: OpenBible.info, CC-BY (data/openbible-cross-references.txt). Both are served with this site, checked against data/manifest.json and kept on this device for offline use.'));
   const linkRef = h('p', { class: 'ref', id: 'xr-link-ref' }), linkMeta = h('p', { class: 'xr-meta', id: 'xr-link-meta' });
@@ -66,7 +66,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   stick.append(base, over); content.append(stick, ruler); scroller.append(content); wrap.append(scroller);
   const listHead = h('p', { class: 'xr-list-h', id: 'xr-list-h' }), listEl = h('ol', { class: 'xr-list', id: 'xr-list', 'aria-label': 'Links in view, highest votes first' });
   const side = h('aside', { class: 'card xr-side', 'aria-labelledby': 'xr-list-h' }, listHead, listEl);
-  main.append(h('h1', { class: 'sr-only' }, 'Cross Ref Map'), h('div', { class: 'xr-top' }, info, box), h('div', { class: 'xr-body' }, wrap, side), drive);
+  main.append(h('h1', { class: 'sr-only' }, 'Cross Ref Map'), h('div', { class: 'xr-top' }, info, box), h('div', { class: 'xr-body' }, wrap, side), status);
 
   let L = null, Lc = null, drawn = 0, drawRaf = 0, animRaf = 0, alive = true, dpr = 1, t0 = performance.now();
   const bctx = base.getContext('2d'), octx = over.getContext('2d');

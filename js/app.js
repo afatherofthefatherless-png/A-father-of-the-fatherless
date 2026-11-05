@@ -6,10 +6,7 @@ import { loadTextSource, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/tex
 import { viewRecord as recordView, closeRecorder, recorderPoke } from './ui/record-view.js';
 import { viewXref, closeXref } from './ui/xref-view.js';
 import { openMic } from './recorder/capture.js';
-import { S, U, stitchBlockers } from './recorder/state.js';
-import { DriveClient } from './drive/drive-api.js';
-import { UploadQueue } from './drive/queue.js';
-import * as auth from './drive/auth.js';
+import { S, stitchBlockers } from './recorder/state.js';
 import { stitchPassage } from './stitch/stitch.js';
 import { gateReportMarkdown } from './stitch/gate.js';
 import { STITCH, OLD, OLD_APPS } from './config.js';
@@ -22,24 +19,19 @@ const h = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
-let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE }, drive, queue;
-const folderCache = new Map();
+let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE };
 
 async function init() {
   try { store = new Store(); await store.getKv('ping'); } catch { store = new MemoryStore(); }
   requestPersistentStorage();
   // Forget what the older releases kept (file ids and their cached copies); data now comes from data/.
   for (const k of ['textSource', 'textCache.v1', 'refsCache.v1']) store.setKv(k, null).catch(() => {});
-  try { for (const k of ['kjv-site.textDriveFileId.v1', 'kjv-site.refsDriveFileId.v1']) localStorage.removeItem(k); } catch {}
+  // Release 12: forget the Drive-era keys too (folder ids, sign-in token). Nothing here talks to Google any more.
+  try { for (const k of ['kjv-site.textDriveFileId.v1', 'kjv-site.refsDriveFileId.v1', 'kjv-site.driveFolders.v1']) localStorage.removeItem(k); } catch {}
+  try { for (const k of Object.keys(sessionStorage)) if (k === 'kjv-site.drive-token.v1') sessionStorage.removeItem(k); } catch {}
   reloadText().then(rerenderTextViews);   // not awaited: the page draws at once and shows "Loading the verse text…"
-  try { for (const [k, v] of JSON.parse(localStorage.getItem('kjv-site.driveFolders.v1') || '[]')) folderCache.set(k, v); } catch {}
-  drive = new DriveClient({ getToken: auth.getToken, folderCache });
-  queue = new UploadQueue({ store, drive, onChange: () => { saveFolders(); if (route().name === 'drive') render(); if (route().name === 'record') recorderPoke(); renderDriveBadge(); } });
-  auth.onAuthChange(() => { renderDriveBadge(); });
-  queue.recover().catch(() => {});
-  window.addEventListener('online', () => queue.kick());
   window.addEventListener('hashchange', render);
-  render(); renderDriveBadge();
+  render();
 }
 /** Shared bar, second row: every older app, on every page (filled once; the header itself is in index.html). */
 function renderAppsNav() {
@@ -72,17 +64,10 @@ function textActions() {
   return h('div', { class: 'row text-actions' });
 }
 
-function saveFolders() { try { localStorage.setItem('kjv-site.driveFolders.v1', JSON.stringify([...folderCache])); } catch {} }
 
 function route() {
   const [path, qs] = (location.hash.replace(/^#/, '') || '/').split('?');
   return { name: path.replace(/^\//, '') || 'home', params: new URLSearchParams(qs || '') };
-}
-async function renderDriveBadge() {
-  const el = $('#drive-badge'); if (!el) return;
-  const ups = await store.allUploads().catch(() => []);
-  const pending = ups.filter(u => u.state !== U.UPLOADED).length;
-  el.textContent = (auth.isSignedIn() ? 'Drive: signed in' : 'Drive: signed out') + (pending ? ` · ${pending} waiting` : '');
 }
 
 async function render() {
@@ -91,9 +76,8 @@ async function render() {
   if (r.name !== 'record') await closeRecorder();
   if (r.name !== 'xref') closeXref();
   try {
-    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, queue, drive, text, auth, openMic, reloadText, textStatusLine, textStatus: () => textStatus });
+    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, text, openMic, reloadText, textStatusLine, textStatus: () => textStatus });
     if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
-    if (r.name === 'drive') return await viewDrive(main);
     if (r.name === 'xref') return await viewXref(main, { h, store, text, textStatusLine, textActions });
     return viewHome(main);
   } catch (e) { main.append(h('p', { class: 'err' }, e.message)); }
@@ -109,7 +93,7 @@ function passageForm(target, value = '') {
 function viewHome(main) {
   main.append(
     h('h1', {}, 'KJV reading site'),
-    h('p', { class: 'lead' }, 'Record one verse at a time, save each verse to Google Drive, and join a passage with StitchBot.'),
+    h('p', { class: 'lead' }, 'Record your own verse and save it to your own computer: one WAV file per verse, then join a passage with StitchBot. Nothing is uploaded.'),
     h('section', { class: 'card' }, h('h2', {}, 'Record'), passageForm('record')),
     h('section', { class: 'card' }, h('h2', {}, 'Stitch'), passageForm('stitch')),
     h('section', { class: 'card' }, h('h2', {}, 'Verse text'),
@@ -117,16 +101,6 @@ function viewHome(main) {
   );
 }
 
-async function viewDrive(main) {
-  const ups = (await store.allUploads()).sort((a, b) => b.updatedAt - a.updatedAt);
-  const btn = h('button', { onclick: async () => { try { await auth.signIn(); await queue.resumeAfterSignIn(); render(); } catch (e) { alert(e.message); } } }, auth.isSignedIn() ? 'Sign in again' : 'Sign in with Google');
-  main.append(h('h1', {}, 'Google Drive'),
-    h('p', { class: 'lead' }, 'Recordings are saved to "KJV Recordings" in your Drive. This site can only see files it saved itself (drive.file permission). There is one file per verse: recording a verse again overwrites its old file.'),
-    h('div', { class: 'row' }, btn, auth.isSignedIn() ? h('button', { onclick: () => { auth.signOut(); render(); } }, 'Sign out') : null,
-      h('button', { onclick: async () => { for (const u of await store.allUploads()) if (u.state === U.UPLOAD_FAILED) await store.putUpload({ ...u, nextAt: 0 }); queue.kick(); } }, 'Retry failed uploads')),
-    h('div', { class: 'table-wrap' }, h('table', {}, h('tr', {}, h('th', {}, 'Verse'), h('th', {}, 'Take'), h('th', {}, 'Upload'), h('th', {}, 'Note')),
-      ...ups.map(u => h('tr', {}, h('td', {}, refOf(u.verseId)), h('td', {}, u.takeNo), h('td', { class: 'st-' + u.state }, u.state), h('td', {}, u.error || ''))))));
-}
 
 // ---------- StitchBot view ----------
 async function viewStitch(main, passage) {
@@ -149,8 +123,7 @@ async function viewStitch(main, passage) {
     }
     const tj = JSON.stringify(r.timings, null, 2);
     out.append(h('audio', { controls: true, src: URL.createObjectURL(new Blob([r.wav], { type: 'audio/wav' })) }),
-      dl(r.wavName, r.wav, 'audio/wav'), dl(r.timingsName, tj, 'application/json'),
-      h('button', { onclick: async ev => { ev.target.disabled = true; try { await drive.uploadStitched(r.wavName, r.wav, 'audio/wav'); await drive.uploadStitched(r.timingsName, new TextEncoder().encode(tj), 'application/json'); ev.target.textContent = 'Saved to Drive'; } catch (e) { ev.target.disabled = false; alert(e.message); } } }, 'Save to Drive (Stitched)'));
+      dl(r.wavName, r.wav, 'audio/wav'), dl(r.timingsName, tj, 'application/json'));
   };
   main.append(h('button', { onclick: () => run(false), disabled: missing.length ? true : false }, 'Run gate and stitch'), out);
 }

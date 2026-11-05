@@ -106,11 +106,6 @@ export function parseFileName(name) {
 }
 
 
-/** Drive folder path for a verse: ['KJV Recordings', '01 Genesis', 'Genesis 3']. */
-export function folderPathOf(id, root = 'KJV Recordings') {
-  const p = must(id); const b = byCode.get(p.code);
-  return [root, `${String(b.num).padStart(2, '0')} ${b.name}`, `${b.refBook} ${p.chapter}`];
-}
 
 export function globalIndexOf(id) { const p = must(id); return chapterOffset.get(p.code)[p.chapter - 1] + p.verse - 1; }
 export function idFromGlobalIndex(g) {

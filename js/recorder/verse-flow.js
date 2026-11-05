@@ -3,11 +3,11 @@
 //   Record starts capturing at once (the old Voice Recorder's behaviour: no "listening to the room" step).
 //   Stop runs "Snip Snip" on that verse: find the real voice start and end, trim, add the fixed padding back
 //   (onset.js rules: 150 ms before the voice, 250 ms after it, 10 ms / 30 ms fades), then -16 LUFS and the checks.
-//   Send captures the WAV: it is saved on this device as the verse's accepted take and queued for Google Drive as
-//   'Genesis 3-14.wav' (colon -> hyphen). A verse that is already on Drive is overwritten in place (same file).
+//   Send captures the WAV: it is saved on this device as the verse's accepted take (IndexedDB) and downloaded as
+//   'Genesis 3-14.wav' (colon -> hyphen). A retake replaces the stored take and downloads under the same name.
 //   Pressing Record (or Re-record) again throws away the take that has not been sent and records the verse again.
 //   After Send the recorder moves to the next verse. When every verse is sent, StitchBot joins them (card 2).
-// DOM-free; mic, store and upload queue are injected, exactly like recorder.js, so tests drive it with a fake mic.
+// DOM-free; mic, store and device saver are injected, exactly like recorder.js, so tests drive it with a fake mic.
 import { SAMPLE_RATE, ONSET } from '../config.js';
 import { S, firstUnsaved } from './state.js';
 import { analyseTake, trimTake } from './onset.js';
@@ -18,7 +18,7 @@ import { expandPassage, formatPassage, fileNameOf, refOf } from '../kjv/ref.js';
 import { MicDeniedError, resampleTo } from './capture.js';
 import { StorageFullError } from '../store/db.js';
 
-/** States of the verse in front of you. 'SAVED' means sent (saved here and queued for Drive), as elsewhere in the site. */
+/** States of the verse in front of you. 'SAVED' means sent (saved on this device), as elsewhere in the site. */
 export const V = Object.freeze({
   IDLE: 'IDLE', STARTING: 'STARTING', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING', READY: 'READY',
   FAILED_CHECK: 'FAILED_CHECK', NO_SPEECH: 'NO_SPEECH', SENDING: 'SENDING', SAVED: S.SAVED,
@@ -69,11 +69,11 @@ export function snipVerse(raw, sr, { calibration = null, dropTailMs = ONSET.stop
 }
 
 export class VerseRecorder {
-  constructor({ passage, store, queue = null, openMic, textSource = null, onUpdate = () => {}, flushWaitMs = 80 }) {
+  constructor({ passage, store, saver = null, openMic, textSource = null, onUpdate = () => {}, flushWaitMs = 80 }) {
     this.passage = formatPassage(passage); this.ids = expandPassage(passage);
-    Object.assign(this, { store, queue, openMic, textSource, onUpdate, flushWaitMs });
+    Object.assign(this, { store, saver, openMic, textSource, onUpdate, flushWaitMs });
     this.state = V.IDLE; this.index = 0; this.statuses = {}; this.gen = 0; this.mic = null; this.take = null;
-    this.chunks = []; this.collecting = false; this.message = ''; this.startedAt = 0;
+    this.chunks = []; this.collecting = false; this.message = ''; this.startedAt = 0; this.lastSave = null;
   }
   get verseId() { return this.ids[this.index]; }
   get fileName() { return fileNameOf(this.verseId); }
@@ -139,7 +139,7 @@ export class VerseRecorder {
     if (r.hardFail) this.message = 'This take failed a check (see below). Tap Re-record and read the verse again.';
     this.go(r.hardFail ? 'failcheck' : 'ready');
   }
-  /** Send: save the WAV as this verse's file (one per verse), queue it for Drive (overwrite in place), go to the next verse. */
+  /** Send: keep the WAV as this verse's take (one per verse), download it as 'Book C-V.wav', go to the next verse. */
   async send() {
     const take = this.take; if (!take || (this.state !== V.READY && this.state !== V.STORAGE_FULL)) return;
     this.go('send');
@@ -150,7 +150,7 @@ export class VerseRecorder {
     this.statuses[take.verseId] = S.SAVED; this.take = null; this.lastSent = { ...saved, status: 'accepted' };
     await this.persist();
     this.go('sent');
-    if (this.queue) this.queue.enqueue(this.lastSent).catch(() => {});
+    if (this.saver) { this.lastSave = await this.saver.saveTake(this.lastSent); if (!this.lastSave.ok) this.message = `Kept on this device, but the download did not start (${this.lastSave.message}). Tap Save again.`; }
     this.next();
   }
   /** Move on to the next verse not sent yet (or stay on the last one when all are sent). */

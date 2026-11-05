@@ -1,5 +1,5 @@
 // Recorder controller: drives the state machine for one passage, one verse at a time.
-// DOM-free; mic, store and upload queue are injected (tests use a fake mic with synthetic audio).
+// DOM-free; mic, store and device saver are injected (tests use a fake mic with synthetic audio).
 import { SAMPLE_RATE, ONSET } from '../config.js';
 import { S, transition, firstUnsaved } from './state.js';
 import { analyseTake, trimTake, calibrateFloor, LiveOnsetDetector } from './onset.js';
@@ -13,9 +13,9 @@ import { StorageFullError } from '../store/db.js';
 const concat = chunks => { const n = chunks.reduce((t, c) => t + c.length, 0), o = new Float32Array(n); let p = 0; for (const c of chunks) { o.set(c, p); p += c.length; } return o; };
 
 export class Recorder {
-  constructor({ passage, store, queue = null, openMic, textSource = null, onUpdate = () => {} }) {
+  constructor({ passage, store, saver = null, openMic, textSource = null, onUpdate = () => {} }) {
     this.passage = formatPassage(passage); this.ids = expandPassage(passage);
-    Object.assign(this, { store, queue, openMic, textSource, onUpdate });
+    Object.assign(this, { store, saver, openMic, textSource, onUpdate });
     this.state = S.IDLE; this.index = 0; this.statuses = {}; this.gen = 0; this.mic = null; this.review = null; this.message = '';
   }
   get verseId() { return this.ids[this.index]; }
@@ -112,7 +112,7 @@ export class Recorder {
     this.review = take;
     this.go(r.hardFail ? 'failcheck' : 'processed');
   }
-  /** REVIEW -> SAVING -> SAVED (upload queued) -> next verse IDLE. Older accepted takes are kept as 'superseded'. */
+  /** REVIEW -> SAVING -> SAVED (downloaded to this device) -> next verse IDLE. Accepting replaces the verse's older takes. */
   async accept() {
     const take = this.review; if (!take) return;
     this.go('accept');
@@ -120,7 +120,7 @@ export class Recorder {
     catch (e) { if (e instanceof StorageFullError) { this.message = 'Device storage is full.'; this.go('storagefull'); return; } throw e; }
     this.statuses[take.verseId] = S.SAVED; await this.persist();
     this.go('saved'); this.review = null;
-    if (this.queue) this.queue.enqueue({ ...take, status: 'accepted' }).catch(() => {});
+    if (this.saver) await this.saver.saveTake({ ...take, status: 'accepted' });
     this.next();
   }
   async skip() {

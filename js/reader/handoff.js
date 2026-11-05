@@ -7,7 +7,6 @@
 // KNOWN LIMIT: the live Reader only accepts tt-audio from the old recorder's origin (https://h2bavvr.sharehtml.org).
 // From this site's origin it will ignore the message until the Reader's allowed-origin check also lists this site.
 // That is a one-line change in the Reader and is NOT made here (the old apps are not changed). Download WAV still works.
-// Also builds the render-job JSON that is saved to Drive for the headless renderer (see README "Rolling Reader and MP4").
 import { OLD } from '../config.js';
 import { BOOKS } from '../kjv/books.js';
 
@@ -110,7 +109,7 @@ export function estimateWords(verseTexts, spans, duration, speech) {
 }
 
 /**
- * Everything the Reader needs, from a stitch result. verseTexts come from the Drive text (never from the repo).
+ * Everything the Reader needs, from a stitch result. verseTexts come from data/kjv-crosswire.json (the loaded TextSource).
  * timings: StitchBot timings ({ verses: [{ id, start_s, end_s, speech_start_s, speech_end_s }] }).
  */
 export function readerInfo(passage, timings, wavName, textSource = null) {
@@ -122,19 +121,6 @@ export function readerInfo(passage, timings, wavName, textSource = null) {
   return {
     name: wavName, passage: coveredRef(passage), text: texts.filter(Boolean).join(' '), footer: shortRef(passage), covered: coveredRef(passage), title: shortRef(passage),
     words: hasText ? estimateWords(texts, spans, duration, speech) : [],
-  };
-}
-
-/** The small render-job file written to Drive ("KJV Recordings/Render jobs/<stem>.render-job.json") for the headless renderer. */
-export function renderJob({ passage, stem, wavName, timingsName, wavFileId = null, timingsFileId = null, info, now = new Date() }) {
-  return {
-    kind: 'kjv-rolling-reader-render-job', version: 1, createdAt: now.toISOString(), status: 'queued',
-    passage: coveredRef(passage), title: info.title, footer: info.footer, covered: info.covered,
-    audio: { name: wavName, folder: 'KJV Recordings/Stitched', driveFileId: wavFileId },
-    timings: { name: timingsName, folder: 'KJV Recordings/Stitched', driveFileId: timingsFileId },
-    words: info.words, // word timings for the rolling text (text itself comes from the Drive verse file)
-    output: { name: `${stem}.mp4`, folder: 'KJV Recordings/Videos' },
-    renderer: 'Headless Rolling Reader on Robin\'s computer (not in this repo yet). Read this job, render, upload the MP4, then set status to "done".',
   };
 }
 

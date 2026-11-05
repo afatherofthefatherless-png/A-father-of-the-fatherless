@@ -61,7 +61,7 @@ main.wide { max-width: 1400px; }
 @media (max-width: 760px) { .xr-top, .xr-body { grid-template-columns: 1fr; } .xr-side { position: static; height: 46vh; } }
 .xr-text:has(.text-status) { max-height: none; overflow: visible; }
 .xr-tick span { white-space: nowrap; }
-/* Link of the Day: two scrollable verse boxes (source, target); ephemeral, text only from the Drive KJV file */
+/* Link of the Day: two scrollable verse boxes (source, target); ephemeral, text from data/kjv-crosswire.json */
 .xr-vboxes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0; }
 .xr-vbox { max-height: 7.5em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; border: 1px solid #555; border-radius: 8px; padding: 4px 8px; font-size: .85em; background: #000; }
 .xr-vbox[hidden] { display: none; }
@@ -75,9 +75,9 @@ main.wide { max-width: 1400px; }
 .xr-top .card { padding: 8px 12px; } .xr-top h2 { font-size: 1.05rem; margin-bottom: 2px; }
 .xr-box .ref { margin: 0; }
 .xr-meta:empty { display: none; }
-/* Drive status, sign-in and file picker help: bottom of the page */
-.xr-drive { margin: 12px 0 0; padding: 10px 14px; }
-.xr-drive h2 { font-size: 1.05rem; margin-bottom: 4px; }
+/* Data status: bottom of the page */
+.xr-status { margin: 12px 0 0; padding: 10px 14px; }
+.xr-status h2 { font-size: 1.05rem; margin-bottom: 4px; }
 .xr-foot { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .xr-foot .xr-text { flex: 1 1 260px; } .xr-foot .xr-text .row, .xr-foot > .row { margin: 0; }
 .xr-text .text-status { font-size: .72em; line-height: 1.35; }

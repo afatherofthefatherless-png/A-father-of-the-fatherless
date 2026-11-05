@@ -1,7 +1,7 @@
 // Record page, rebuilt on the old Voice Recorder (transcript-tidier.html): the same cards, look and words
 // ("Passage" with "Pick from the Bible" and the passage text box, "1. Your reading", "2. Make the clean version",
 // "3. Your audio" with Send to Rolling Reader / Download WAV / Save or share), inside the shared site bar.
-// Changed from the old page: recording is per verse (Record / Stop / Send), each verse is its own WAV on Drive,
+// Changed from the old page: recording is per verse (Record / Stop / Send), each verse is its own WAV saved to this device,
 // card 2 runs StitchBot by itself when the last verse is sent, and a "Passages to record" list comes from the tracker.
 // Card 1 shows the passage text box (with A-/A+ and verse numbers) ABOVE the Record / Send / Re-record buttons.
 import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, parseId } from '../kjv/ref.js';
@@ -10,12 +10,13 @@ import { VerseRecorder, V } from '../recorder/verse-flow.js';
 import { PassagePipeline } from '../recorder/pipeline.js';
 import { takeHandoff, chunkStatuses, nextChunkIndex } from '../recorder/chunks.js';
 import { readerInfo, sendToReader } from '../reader/handoff.js';
-import { S, U } from '../recorder/state.js';
+import { S } from '../recorder/state.js';
+import { DeviceSaver, saveFile, shareFile, canShareFiles } from '../save/device-save.js';
 
 let rec = null, pipe = null, paintNow = null, timer = 0;
 export async function closeRecorder() { clearInterval(timer); timer = 0; paintNow = null; if (rec) await rec.close(); rec = null; pipe = null; }
-/** Called by the app when the upload queue changes or the sign-in/text changes. */
-export function recorderPoke() { if (pipe) pipe.refresh().then(() => pipe && pipe.result && !pipe.job ? pipe.upload() : null).catch(() => {}); if (paintNow) paintNow(); }
+/** Called by the app when the verse text changes. */
+export function recorderPoke() { if (pipe) pipe.refresh().catch(() => {}); if (paintNow) paintNow(); }
 
 const PT_SIZES = [0.95, 1.05, 1.15, 1.25, 1.4, 1.55, 1.75, 2, 2.3];
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
@@ -23,7 +24,8 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export async function viewRecord(main, ctx) {
-  const { h, params, store, queue, drive, text, auth, openMic } = ctx;
+  const { h, params, store, text, openMic } = ctx;
+  const saveFn = ctx.saveFile || saveFile, saver = new DeviceSaver({ store, save: saveFn });
   const passageParam = params.get('passage');
   const handoff = takeHandoff(params);
   let p = null, perr = '';
@@ -31,8 +33,8 @@ export async function viewRecord(main, ctx) {
   const label = p ? formatPassage(p) : '';
   if (rec && rec.passage !== label) await closeRecorder();
   if (p && !rec) {
-    rec = await new VerseRecorder({ passage: p, store, queue, openMic, textSource: text, onUpdate: () => paintNow && paintNow() }).load();
-    pipe = new PassagePipeline({ passage: p, store, drive, textSource: text, getToken: auth.getToken, onUpdate: () => paintNow && paintNow() });
+    rec = await new VerseRecorder({ passage: p, store, saver, openMic, textSource: text, onUpdate: () => paintNow && paintNow() }).load();
+    pipe = new PassagePipeline({ passage: p, store, save: saveFn, textSource: text, onUpdate: () => paintNow && paintNow() });
     pipe.run().catch(e => pipe && pipe.set('gate', 'bad', `Gate: ${e.message}`));
   }
   const R = rec, P = pipe;
@@ -143,22 +145,29 @@ export async function viewRecord(main, ctx) {
   const recBtn = h('button', { type: 'button', class: 'rec', 'aria-pressed': 'false' }, 'Record');
   const sendBtn = h('button', { type: 'button', class: 'send' }, 'Send');
   const reBtn = h('button', { type: 'button', class: 'ghost' }, 'Re-record');
+  const againBtn = h('button', { type: 'button', class: 'ghost save-again', hidden: true }, 'Save again');
+  const shareBtn = h('button', { type: 'button', class: 'ghost share-verse', hidden: true }, 'Share or Save to Files');
+  const saveNote = h('p', { class: 'note savenote', 'aria-live': 'polite' });
   const inStatus = h('div', { class: 'status', 'aria-live': 'polite' }), inWarn = h('div', { class: 'warn', hidden: true });
   const review = h('div', { class: 'review' }), verses = h('ol', { class: 'verses', 'aria-label': 'Verses in this passage' });
   recBtn.addEventListener('click', () => { if (R.state === V.RECORDING) R.stop(); else R.record(); });
   reBtn.addEventListener('click', () => R.record());
+  const saveAgain = async id => { const r = await saver.saveAgain(id); R.message = r.ok ? '' : `Could not save ${r.name}: ${r.message}`; await pipe.refresh(); paint(); };
+  againBtn.addEventListener('click', () => saveAgain(R.verseId));
+  shareBtn.addEventListener('click', async () => { const t = await store.acceptedTake(R.verseId); if (!t) return; try { await shareFile(t.fileName || R.fileName, t.wav, 'audio/wav'); } catch (e) { if (e && e.name !== 'AbortError') { R.message = 'Could not share: ' + e.message; paint(); } } });
   sendBtn.addEventListener('click', async () => { await R.send(); if (R.complete) pipe && pipe.run({ force: true }); else pipe && pipe.refresh(); });
   wrap.append(h('section', { class: 'card', 'aria-labelledby': 'h-in' }, h('h2', { id: 'h-in' }, '1. Your reading'),
     h('p', { class: 'readtitle' }, rtRef, rtFile),
     ptBox, // Robin: the verse text sits ABOVE the Record / Send / Re-record buttons, in the same card
     h('div', { class: 'btnrow recrow' }, recBtn, sendBtn, reBtn), inStatus, inWarn, review,
+    h('div', { class: 'btnrow saverow' }, againBtn, shareBtn), saveNote,
     h('details', { class: 'vlist', open: R.ids.length <= 12 }, h('summary', {}, 'Verses'), verses)));
 
   // ---------- 2. Make the clean version (runs by itself) ----------
   const steps = h('ul', { class: 'steps pipeline', 'aria-live': 'polite' });
   const stepBtns = h('div', { class: 'btnrow', style: 'margin-top:12px' });
   wrap.append(h('section', { class: 'card', 'aria-labelledby': 'h-go' }, h('h2', { id: 'h-go' }, '2. Make the clean version'),
-    h('p', { class: 'note' }, 'This runs by itself after you send the last verse: each verse is trimmed (Snip Snip) when you tap Stop, the gate checks them all, StitchBot joins them with a 0.4 s break, saves the result to Drive and leaves a job for the Rolling Reader renderer.'),
+    h('p', { class: 'note' }, 'This runs by itself after you send the last verse: each verse is trimmed (Snip Snip) when you tap Stop, the gate checks them all, StitchBot joins them with a 0.4 s break and saves the result to this device. Nothing is uploaded anywhere.'),
     steps, stepBtns));
 
   // ---------- 3. Your audio ----------
@@ -209,24 +218,25 @@ export async function viewRecord(main, ctx) {
           h('ul', { class: 'checks' }, ...(bad.length ? bad.map(([k, c]) => h('li', { class: 'c-' + c.status }, `${k}: ${c.status} (${c.value})`)) : [h('li', { class: 'c-PASS' }, 'All checks passed')])));
       }
     }
-    // verse list with per-verse status (captured / Drive)
-    const ups = await store.allUploads().catch(() => []), upBy = {};
-    for (const id of R.ids) { const t = await store.acceptedTake(id); if (t) { const u = ups.find(x => x.takeId === t.takeId); upBy[id] = u ? u.state : 'QUEUED'; } }
+    // verse list with per-verse status (kept here / downloaded) and Save again
+    const savedBy = {};
+    for (const id of R.ids) { const t = await store.acceptedTake(id); if (t) { const s = await saver.savedInfo(id); savedBy[id] = s && s.takeId === t.takeId ? s : false; } }
     if (rec !== R) return;
-    const upWord = s => ({ [U.UPLOADED]: 'saved to Drive', [U.QUEUED]: 'waiting to upload', [U.UPLOADING]: 'uploading', [U.UPLOAD_FAILED]: 'upload failed, will retry', [U.AUTH_EXPIRED]: 'waiting for Google sign-in' })[s] || s;
+    const when = ms => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     verses.replaceChildren(...R.ids.map((id, i) => h('li', { class: (i === R.index ? 'cur ' : '') + (R.statuses[id] === S.SAVED ? 'sent' : '') },
       h('button', { type: 'button', class: 'link', onclick: () => { try { R.select(i); } catch (e) { R.message = e.message; paint(); } } }, refOf(id)),
-      h('span', { class: 'vst' }, R.statuses[id] === S.SAVED ? ` WAV captured · ${upWord(upBy[id])}` : i === R.index ? ' recording this one' : ' not sent yet'))));
+      h('span', { class: 'vst' }, R.statuses[id] === S.SAVED ? (savedBy[id] ? ` saved to this device as ${fileNameOf(id)} (${when(savedBy[id].savedAt)})` : ` kept on this device · not downloaded yet`) : i === R.index ? ' recording this one' : ' not sent yet'),
+      R.statuses[id] === S.SAVED && id in savedBy ? h('button', { type: 'button', class: 'ghost small save-again-v', onclick: () => saveAgain(id) }, 'Save again') : null)));
+    { const sent = R.statuses[R.verseId] === S.SAVED && R.verseId in savedBy;
+      againBtn.hidden = !sent; shareBtn.hidden = !sent || !canShareFiles();
+      saveNote.textContent = sent ? (savedBy[R.verseId] ? `${R.fileName} was saved to this device (your Downloads; on iPad, Files \u203a Downloads). Recording this verse again replaces it under the same name. Save again downloads it again.` : `${R.fileName} is kept on this device but was not downloaded. Tap Save again.`) : ''; }
     if (lastIndex !== R.index) { lastIndex = R.index; paintText(); } else if (!text.loaded || paintedLoaded !== text.loaded) paintText();
     // pipeline lines
-    const lines = [['captured', P.stage.captured], ['drive', P.stage.drive], ['gate', P.stage.gate], ['stitched', P.stage.stitched], ['queued', P.stage.queued],
-      ['rendered', { ...P.stage.rendered, text: 'MP4 rendered: ' + P.stage.rendered.text }], ['mp4', { ...P.stage.mp4, text: 'MP4 on Drive: ' + P.stage.mp4.text }]];
+    const lines = [['captured', P.stage.captured], ['saved', P.stage.saved], ['gate', P.stage.gate], ['stitched', P.stage.stitched],
+      ['rendered', { ...P.stage.rendered, text: 'MP4 rendered: ' + P.stage.rendered.text }], ['mp4', { ...P.stage.mp4, text: 'MP4 saved: ' + P.stage.mp4.text }]];
     steps.replaceChildren(...lines.map(([k, s]) => h('li', { class: 'st-' + s.state, 'data-s': k }, h('span', { class: 'sr-only' }, s.state + ': '), s.text || '')));
     const btns = [];
-    const needSignIn = P.stage.drive.state === 'wait' || P.stage.queued.state === 'wait' && /sign-in/.test(P.stage.queued.text);
-    if (needSignIn) btns.push(h('button', { type: 'button', onclick: async ev => { ev.target.disabled = true; try { await auth.needToken(); await queue.resumeAfterSignIn(); queue.kick(); await P.run(); } catch (e) { sendSay(e.message, true); } finally { paint(); } } }, 'Sign in to save to Drive'));
     if (P.stage.gate.state === 'wait') btns.push(h('button', { type: 'button', onclick: () => { P.acceptWarnings = true; P.run({ acceptWarnings: true, force: true }); } }, 'OK the warnings and stitch'));
-    if (P.stage.queued.state === 'bad') btns.push(h('button', { type: 'button', onclick: () => P.upload() }, 'Try again'));
     stepBtns.replaceChildren(...btns);
     // card 3
     const r = P.result;

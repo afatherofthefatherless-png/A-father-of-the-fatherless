@@ -35,6 +35,81 @@ export function groupOfBook(i) { return GROUPS.findIndex(g => i >= g.from && i <
 export const BOOK_START = (() => { const a = []; let g = 0; for (const b of BOOKS) { a.push(g); g += b.counts.reduce((x, y) => x + y, 0); } a.push(g); return a; })();
 export function bookIndexAt(g) { let lo = 0, hi = BOOKS.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (BOOK_START[m] <= g) lo = m; else hi = m - 1; } return lo; }
 
+/** Global verse index of the first verse of a 1-based chapter in a book. */
+export function chapterStart(bookIdx, chapter) {
+  const counts = BOOKS[bookIdx].counts;
+  const ch = Math.max(1, Math.min(counts.length, chapter | 0));
+  let g = BOOK_START[bookIdx];
+  for (let i = 0; i < ch - 1; i++) g += counts[i];
+  return g;
+}
+
+/**
+ * How many loaded refs touch each book. A ref counts once in a book, even if both ends (or a target
+ * range) stay in that book; a ref that runs from one book to another counts in each.
+ */
+export function bookConnectionCounts(set) {
+  const c = new Int32Array(BOOKS.length);
+  if (!set) return c;
+  for (let r = 0; r < set.total; r++) {
+    const a = bookIndexAt(set.from[r]);
+    let b0 = bookIndexAt(set.to[r]), b1 = bookIndexAt(set.toEnd[r]);
+    if (b1 < b0) { const tmp = b0; b0 = b1; b1 = tmp; }
+    c[a]++;
+    for (let b = b0; b <= b1; b++) if (b !== a) c[b]++;
+  }
+  return c;
+}
+
+/** Ranks in [0, n) whose from-verse or to-range includes global verse g. */
+export function ranksTouching(set, n, g) {
+  const out = [];
+  if (!set || g < 0) return out;
+  const lim = Math.min(n, set.total);
+  for (let r = 0; r < lim; r++) if (set.from[r] === g || (set.to[r] <= g && set.toEnd[r] >= g)) out.push(r);
+  return out;
+}
+
+/** Minimum book-band height (px) so every book stays tappable on a touch screen. */
+export const BOOK_MIN_H = 36;
+
+/**
+ * Vertical bands for the 66 books: each book's height is proportional to its connection count,
+ * then lifted to at least minH. If height is less than 66 * minH, the total grows to fit.
+ * Returns { y0, heights, h } in content px (add L.top when drawing).
+ */
+export function bookBands(counts, height, minH = BOOK_MIN_H) {
+  const n = BOOKS.length, c = counts || new Int32Array(n);
+  let sum = 0; for (let i = 0; i < n; i++) sum += Math.max(0, c[i] | 0);
+  const H = Math.max(Number(height) || 0, n * minH), extra = H - n * minH;
+  const y0 = new Float64Array(n + 1), heights = new Float64Array(n);
+  let y = 0;
+  for (let i = 0; i < n; i++) {
+    const h = minH + (sum > 0 ? extra * (Math.max(0, c[i] | 0) / sum) : extra / n);
+    heights[i] = h; y0[i] = y; y += h;
+  }
+  y0[n] = y;
+  return { y0, heights, h: y };
+}
+
+/** Content y of the centre of global verse g, in a connection-weighted book layout. */
+export function verseY(g, bands, top) {
+  if (g >= TOTAL_VERSES) return top + bands.h;
+  const i = bookIndexAt(Math.max(0, g));
+  const g0 = BOOK_START[i], g1 = BOOK_START[i + 1];
+  return top + bands.y0[i] + (g + 0.5 - g0) / (g1 - g0) * (bands.y0[i + 1] - bands.y0[i]);
+}
+
+/** Global verse index at content y (inverse of verseY, matching the old uniform rounding). */
+export function verseAtY(y, bands, top) {
+  const yy = y - top;
+  let lo = 0, hi = BOOKS.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (bands.y0[m] <= yy) lo = m; else hi = m - 1; }
+  const y0 = bands.y0[lo], span = bands.y0[lo + 1] - y0, g0 = BOOK_START[lo], g1 = BOOK_START[lo + 1];
+  const t = span > 0 ? (yy - y0) / span : 0;
+  return Math.max(g0, Math.min(g1 - 1, Math.round(t * (g1 - g0) - 0.5)));
+}
+
 /**
  * Parses the file text into a ranked set (highest votes first; ties keep file order).
  * Returns { total, skipped, header, from, to, toEnd, votes, order } where from/to/toEnd are Int32Array global verse
@@ -164,7 +239,7 @@ export class ArcIndex {
 // ---------- Scrolling map helpers (L.sy = scroll offset in px; L.y already subtracts it) ----------
 /** Global verse indices [g0, g1] covered by the viewport (0..L.H px) at the current scroll offset. */
 export function visibleRange(L) {
-  const at = y => Math.max(0, Math.min(TOTAL_VERSES - 1, Math.round((y + L.sy - L.top) / L.h * TOTAL_VERSES - 0.5)));
+  const at = y => L.verseAt ? L.verseAt(y + L.sy) : Math.max(0, Math.min(TOTAL_VERSES - 1, Math.round((y + L.sy - L.top) / L.h * TOTAL_VERSES - 0.5)));
   return [at(0), at(L.H)];
 }
 /** Does arc r cross the viewport vertically? (cheap cull: its y-span overlaps 0..L.H) */

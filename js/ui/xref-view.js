@@ -3,7 +3,8 @@
 // Arc maths ported from the "Top 100 Arcs" prototype (bible-arc-diagram.html), redrawn on <canvas> for 344,799 arcs.
 import { BOOKS } from '../kjv/books.js';
 import { OSIS, GROUPS, groupOfBook, BOOK_START, bookIndexAt, THRESHOLDS, stepInfo, stepLabel, fmt, linkAt,
-  pickTop, topInBook, arcOf, pointOn, ArcIndex, TOP_PICK, TOTAL_VERSES, visibleRange, refsInRange, arcVisible, fileInfo } from '../xref/xrefs.js';
+  pickTop, arcOf, pointOn, ArcIndex, TOP_PICK, TOTAL_VERSES, visibleRange, refsInRange, arcVisible, fileInfo,
+  bookConnectionCounts, bookBands, BOOK_MIN_H, chapterStart, verseY, verseAtY, ranksTouching } from '../xref/xrefs.js';
 import { loadRefs, devRefsUrl, REFS_FILE_NAME } from '../xref/refs-source.js';
 
 const BATCH = 6000;      // arcs drawn per animation frame (progressive; the page never blocks)
@@ -26,7 +27,8 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   const devMotion = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).get('motion') === 'reduce'; // test-only emulation
   const reduce = devMotion || !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   if (state && state.reduce !== reduce) state = null;
-  if (!state) state = { reduce, set: null, status: 'loading', message: 'Loading the cross-references…', from: '', sel: -1, playing: !reduce, shown: localStorage.getItem(SLIDER_KEY) != null ? Number(localStorage.getItem(SLIDER_KEY)) : 2, note: '' };
+  if (!state) state = { reduce, set: null, status: 'loading', message: 'Loading the cross-references…', from: '', sel: -1, node: -1, openBook: -1, playing: !reduce, shown: localStorage.getItem(SLIDER_KEY) != null ? Number(localStorage.getItem(SLIDER_KEY)) : 2, note: '' };
+  if (state.node == null) state.node = -1; if (state.openBook == null) state.openBook = -1;
   const devUrl = devRefsUrl(location.search || location.hash.split('?')[1], location.hostname);
 
   // ---- top bar: info (left) | Link of the Day (right)
@@ -43,7 +45,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     h('p', { class: 'xr-credit' }, 'Cross-references: ', h('a', { href: 'https://www.openbible.info/labs/cross-references/', target: '_blank', rel: 'noopener' }, 'OpenBible.info'), ' (CC-BY).'));
   const status = h('section', { class: 'card xr-status', id: 'xr-status', 'aria-labelledby': 'xr-status-h' },
     h('h2', { id: 'xr-status-h' }, 'Data status'), srcEl, actions,
-    h('p', { class: 'xr-help' }, 'Scroll down the page through the map from Genesis to Revelation. Tap an arc, a book, or a row in the list to put that link in the box.'),
+    h('p', { class: 'xr-help' }, 'Scroll down the page through the map from Genesis to Revelation. Tap a book on the left for its chapters, a chapter to go there, or an arc or a row in the list to put that link in the box. Tap empty space to clear the highlight.'),
     h('p', { class: 'xr-credit' }, 'Verse text: CrossWire KJV (data/kjv-crosswire.json). Cross-references: OpenBible.info, CC-BY (data/openbible-cross-references.txt). Both are served with this site, checked against data/manifest.json and kept on this device for offline use.'));
   const linkRef = h('p', { class: 'ref', id: 'xr-link-ref' }), linkMeta = h('p', { class: 'xr-meta', id: 'xr-link-meta' });
   const srcBox = h('div', { class: 'xr-vbox', id: 'xr-src-text', tabindex: '0', 'aria-label': 'Source verse text' }), tgtBox = h('div', { class: 'xr-vbox', id: 'xr-tgt-text', tabindex: '0', 'aria-label': 'Target verse text' });
@@ -61,7 +63,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   const wrap = h('div', { class: 'xr-map', id: 'xr-map' });
   const scroller = h('div', { class: 'xr-scroll', id: 'xr-scroll' });
   const content = h('div', { class: 'xr-content' }), stick = h('div', { class: 'xr-stick' });
-  const base = h('canvas', { class: 'xr-base', 'aria-hidden': 'true' }), over = h('canvas', { class: 'xr-over', role: 'img', 'aria-label': 'Cross-reference arc map. Use the ruler of books on the left.' });
+  const base = h('canvas', { class: 'xr-base', 'aria-hidden': 'true' }), over = h('canvas', { class: 'xr-over', role: 'img', 'aria-label': 'Cross-reference arc map. Use the list of books on the left.' });
   const ruler = h('div', { class: 'xr-ruler', role: 'list', 'aria-label': 'Books of the Bible' });
   stick.append(base, over); content.append(stick, ruler); scroller.append(content); wrap.append(scroller);
   const listHead = h('p', { class: 'xr-list-h', id: 'xr-list-h' }), listEl = h('ol', { class: 'xr-list', id: 'xr-list', 'aria-label': 'Links in view, highest votes first' });
@@ -79,30 +81,59 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     const hdr = headerH(); main.style.setProperty('--xr-hdr', hdr + 'px');
     const W = Math.max(280, scroller.clientWidth), vh = window.innerHeight;
     const oldH = W < 520 || window.innerWidth <= 760 ? Math.round(vh * 0.7) : Math.max(420, vh - 120); // the release-9 map height
-    const CH = Math.max(LONG * oldH, Math.round(W * 1.5)), H = Math.max(240, Math.min(CH, vh - hdr));
+    let CH = Math.max(LONG * oldH, Math.round(W * 1.5));
+    const top = 8, counts = state.set ? (state.set._bookCounts || (state.set._bookCounts = bookConnectionCounts(state.set))) : null;
+    const bands = counts ? bookBands(counts, Math.max(CH - 16, BOOKS.length * BOOK_MIN_H)) : null;
+    if (bands) CH = Math.max(CH, Math.round(bands.h + 16));
+    const H = Math.max(240, Math.min(CH, vh - hdr));
     wrap.style.height = CH + 'px'; wrap.dataset.mapH = String(CH); wrap.dataset.oldH = String(oldH);
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     for (const c of [base, over]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); c.style.width = W + 'px'; c.style.height = H + 'px'; }
     stick.style.height = H + 'px';
-    const rw = W < 520 ? 54 : 92, top = 8, hh = CH - 16;
+    const rw = W < 520 ? 100 : 156, hh = bands ? bands.h : CH - 16;
     content.style.height = CH + 'px';
     // L.y is in viewport px (content y minus the scroll offset); Lc is the same layout at offset 0 (content coords, for the index)
-    L = { W, H, CH, sy: 0, x0: rw, maxW: W - rw - 8, top, h: hh, y: g => top + (g + 0.5) / TOTAL_VERSES * hh - L.sy };
-    Lc = { ...L, sy: 0, y: g => top + (g + 0.5) / TOTAL_VERSES * hh };
+    const yOf = (g, sy) => (bands ? verseY(g, bands, top) : top + (g + 0.5) / TOTAL_VERSES * hh) - sy;
+    const atOf = yc => bands ? verseAtY(yc, bands, top) : Math.max(0, Math.min(TOTAL_VERSES - 1, Math.round((yc - top) / hh * TOTAL_VERSES - 0.5)));
+    L = { W, H, CH, sy: 0, x0: rw, maxW: W - rw - 8, top, h: hh, bands, y: g => yOf(g, L.sy), verseAt: atOf };
+    Lc = { ...L, sy: 0, y: g => yOf(g, 0), verseAt: atOf };
     L.sy = offset(); wrap.dataset.sy = String(Math.round(L.sy));
     index = null; buildRuler();
   }
   // the page scrolls; the canvases are sticky inside the tall map, so the visible slice starts at their offset in the content
   function headerH() { const e = document.querySelector('header.top'); return e ? Math.round(e.getBoundingClientRect().height) : 0; }
   function offset() { return Math.max(0, Math.round(stick.getBoundingClientRect().top - content.getBoundingClientRect().top)); }
+  function goToVerse(g) {
+    if (!L) return;
+    const y = Math.max(0, Math.min(L.CH - L.H, (L.y(g) + L.sy) - 8));
+    window.scrollTo(0, Math.round(content.getBoundingClientRect().top + window.scrollY - headerH() + y));
+  }
+  function toggleBook(i) {
+    state.openBook = state.openBook === i ? -1 : i;
+    buildRuler();
+    if (state.openBook >= 0) goToVerse(BOOK_START[state.openBook]);
+  }
   function buildRuler() {
     ruler.replaceChildren(); ruler.style.width = L.x0 + 'px';
     BOOKS.forEach((b, i) => {
       const y1 = Lc.y(BOOK_START[i]) - 0.5, y2 = Lc.y(BOOK_START[i + 1]) - 0.5, g = GROUPS[groupOfBook(i)];
-      const t = h('button', { type: 'button', class: 'xr-tick' + (y2 - y1 < 13 ? ' tiny' : ''), role: 'listitem', 'data-book': String(i), title: b.name, 'aria-label': `${b.name}: show its top link`,
-        style: `top:${y1}px;height:${Math.max(2, y2 - y1)}px;--g:${g.color}`, onclick: () => { if (!state.set) return; const r = topInBook(state.set, i, n()); select(r >= 0 ? r : topInBook(state.set, i)); } },
-        h('span', {}, y2 - y1 >= 13 ? OSIS[i] : ''));
+      const open = state.openBook === i, chs = b.counts.length, label = L.W < 520 ? OSIS[i] : b.name;
+      const t = h('button', { type: 'button', class: 'xr-tick' + (open ? ' open' : ''), role: 'listitem', 'data-book': String(i), title: b.name,
+        'aria-label': `${b.name}, ${chs} chapter${chs === 1 ? '' : 's'}`, 'aria-expanded': String(open),
+        style: `top:${y1}px;height:${Math.max(2, y2 - y1)}px;--g:${g.color}`, onclick: () => toggleBook(i) },
+        h('span', {}, label));
       ruler.append(t);
+      if (open) {
+        const space = L.CH - y2, maxH = Math.min(280, Math.max(120, space > 80 ? space - 4 : y1));
+        const top = space > 80 ? y2 : Math.max(0, y1 - maxH);
+        const panel = h('div', { class: 'xr-chaps', id: 'xr-chaps', 'data-book': String(i), role: 'list', 'aria-label': `Chapters of ${b.name}`,
+          style: `top:${top}px;max-height:${maxH}px` });
+        for (let c = 1; c <= chs; c++) {
+          panel.append(h('button', { type: 'button', class: 'xr-chap', role: 'listitem', 'data-chapter': String(c),
+            'aria-label': `${b.name} ${c}`, onclick: ev => { ev.stopPropagation(); goToVerse(chapterStart(i, c)); } }, String(c)));
+        }
+        ruler.append(panel);
+      }
     });
   }
   const alphaFor = N => Math.max(0.035, Math.min(0.85, 18 / Math.sqrt(Math.max(1, N))));
@@ -139,7 +170,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   }
   /** Slider moved: arcs that arrive draw themselves in (0.4 s), dropped arcs fade out (0.2 s); big jumps just jump. */
   function changeShown() {
-    const N = n(), prev = lastN; lastN = N; index = null; setHover(-1);
+    const N = n(), prev = lastN; lastN = N; index = null;
     if (!state.set) return;
     if (!motion() || Math.abs(N - prev) > DRAWIN_MAX || prev === 0) { drawIn = fading = null; wrap.dataset.transition = 'jump'; redrawBase(); kick(); return; }
     wrap.dataset.transition = N > prev ? 'draw-in' : 'fade-out';
@@ -154,6 +185,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   }
   const ease = t => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
   function setHover(r) { if (r !== hover) { hover = r; hoverT = performance.now(); wrap.dataset.hover = String(r); kick(); } }
+  function bumpHi() { hoverT = performance.now(); kick(); }
 
   // Overlay: everything that moves (wave, draw-in, fades, glow, dots, hover/selection). The static layer is never redrawn per frame.
   function drawOver(now) {
@@ -199,17 +231,22 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
       }
       octx.fill(); octx.globalAlpha = 1; busy = true;
     }
-    // (5) hover/tap: dim the rest, brighten + thicken the nearest arc, label both verses (0.15 s fade)
-    const target = hover >= 0 ? 1 : 0, hp = motion() ? Math.min(1, (now - hoverT) / HOVER_MS) : 1;
+    // (5) click/tap selection: dim the rest, highlight the chosen node and its links, label the chosen link (0.15 s fade)
+    const target = (state.sel >= 0 || state.node >= 0) ? 1 : 0, hp = motion() ? Math.min(1, (now - hoverT) / HOVER_MS) : 1;
     dim = target ? Math.max(dim, hp) : Math.min(dim, 1 - hp);
     if (dim > 0.001) { octx.fillStyle = `rgba(0,0,0,${0.6 * dim})`; octx.fillRect(L.x0 + 1, 0, L.W, L.H); }
     if (hp < 1) busy = true;
-    for (const [r, col, w] of [[state.sel, YELLOW, 3], [hover, '#fff', 3.5]]) {
-      if (r < 0 || r >= S.total) continue;
-      const a = arcOf(S, r, L); octx.globalAlpha = r === hover ? Math.max(dim, 0.2) : 1; octx.strokeStyle = col; octx.lineWidth = w; octx.beginPath(); strokeArc(octx, a); octx.stroke();
-      if (r === state.sel && anim) { const p = pointOn(a, (sec / 2.4) % 1); octx.fillStyle = YELLOW; octx.beginPath(); octx.arc(p.x, p.y, 5, 0, Math.PI * 2); octx.fill(); }
-      if (r === hover) { const l = linkAt(S, r); octx.font = '600 12px OpenDyslexic, system-ui, sans-serif'; octx.fillStyle = '#fff';
-        const p0 = pointOn(a, 0), p1 = pointOn(a, 1); octx.fillText(l.fromRef, L.x0 + 6, Math.min(L.H - 18, Math.max(12, p0.y - 4))); octx.fillText(l.toRef, L.x0 + 6, Math.max(26, Math.min(L.H - 4, p1.y + 14))); }
+    if (state.node >= 0) {
+      octx.strokeStyle = '#fff'; octx.lineWidth = 3.5; octx.globalAlpha = Math.max(dim, 0.2); octx.beginPath();
+      for (const r of ranksTouching(S, N, state.node)) if (r !== state.sel && arcVisible(S, r, L)) strokeArc(octx, arcOf(S, r, L));
+      octx.stroke();
+      const ny = L.y(state.node); octx.fillStyle = YELLOW; octx.globalAlpha = 1; octx.beginPath(); octx.arc(L.x0, ny, 4, 0, Math.PI * 2); octx.fill();
+    }
+    if (state.sel >= 0 && state.sel < S.total) {
+      const r = state.sel, a = arcOf(S, r, L); octx.globalAlpha = 1; octx.strokeStyle = YELLOW; octx.lineWidth = 3; octx.beginPath(); strokeArc(octx, a); octx.stroke();
+      if (anim) { const p = pointOn(a, (sec / 2.4) % 1); octx.fillStyle = YELLOW; octx.beginPath(); octx.arc(p.x, p.y, 5, 0, Math.PI * 2); octx.fill(); }
+      const l = linkAt(S, r); octx.font = '600 12px OpenDyslexic, system-ui, sans-serif'; octx.fillStyle = '#fff';
+      const p0 = pointOn(a, 0), p1 = pointOn(a, 1); octx.fillText(l.fromRef, L.x0 + 6, Math.min(L.H - 18, Math.max(12, p0.y - 4))); octx.fillText(l.toRef, L.x0 + 6, Math.max(26, Math.min(L.H - 4, p1.y + 14)));
     }
     octx.globalAlpha = 1;
     const ft = performance.now() - f0; perf.frames++; perf.total += ft; perf.max = Math.max(perf.max, ft); lastFrame = now;
@@ -230,15 +267,25 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     return index.nearest(x, y + L.sy, tol);
   }
 
-  function select(r) {
-    if (!state.set || r < 0) return; state.sel = r; state.note = ''; note.textContent = '';
-    fillBox(); markList(); kick();
+  function clearSel() {
+    if (state.sel < 0 && state.node < 0) return;
+    state.sel = -1; state.node = -1; state.note = ''; note.textContent = '';
+    fillBox(); markList(); bumpHi();
+  }
+  function select(r, node) {
+    if (!state.set || r < 0) return;
+    state.sel = r; state.node = node != null ? node : state.set.from[r]; state.note = ''; note.textContent = '';
+    fillBox(); markList(); bumpHi();
+  }
+  function nodeNear(r, y) {
+    const S = state.set, y1 = L.y(S.from[r]), y2 = L.y((S.to[r] + S.toEnd[r]) / 2);
+    return Math.abs(y - y1) <= Math.abs(y - y2) ? S.from[r] : S.to[r];
   }
   function fillBox() {
     const l = state.set && linkAt(state.set, state.sel);
     pickBtn.disabled = !state.set;
     linkText.replaceChildren(); srcBox.replaceChildren(); tgtBox.replaceChildren();
-    if (!l) { linkRef.textContent = state.set ? 'No link chosen yet' : 'No cross-references loaded'; srcBox.hidden = tgtBox.hidden = true; linkMeta.textContent = state.set ? `Tap an arc, a book, or Pick from top ${fmt(TOP_PICK)}.` : ''; return; }
+    if (!l) { linkRef.textContent = state.set ? 'No link chosen yet' : 'No cross-references loaded'; srcBox.hidden = tgtBox.hidden = true; linkMeta.textContent = state.set ? `Tap an arc or a row in the list, or Pick from top ${fmt(TOP_PICK)}.` : ''; return; }
     linkRef.textContent = `${l.fromRef} → ${l.toRef}`; fillShare();
     srcBox.setAttribute('aria-label', `Verse text: ${l.fromRef}`); tgtBox.setAttribute('aria-label', `Verse text: ${l.toRef}`);
     linkMeta.textContent = ''; srcBox.hidden = tgtBox.hidden = false;
@@ -273,8 +320,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     listHead.textContent = `Links in view: ${a} to ${b}${rows.length >= LIST_MAX ? ` (top ${LIST_MAX})` : ` (${rows.length})`}`;
     if (key === listKey && !force) return; listKey = key;
     listEl.replaceChildren(...rows.map(r => { const l = linkAt(S, r);
-      return h('li', {}, h('button', { type: 'button', class: 'xr-row', 'data-rank': String(r), onclick: () => select(r),
-        onpointerenter: ev => { if (ev.pointerType === 'mouse') setHover(r); }, onpointerleave: () => setHover(-1), onfocus: () => setHover(r), onblur: () => setHover(-1) },
+      return h('li', {}, h('button', { type: 'button', class: 'xr-row', 'data-rank': String(r), onclick: () => select(r) },
         h('span', { class: 'xr-row-ref' }, `${l.fromRef} → ${l.toRef}`), h('span', { class: 'xr-row-v' }, fmt(l.votes)))); }));
     wrap.dataset.listRows = String(rows.length); markList();
   }
@@ -296,7 +342,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     Object.assign(state, { set: r.set, status: r.status, message: r.message, from: r.from });
     if (r.set && state.sel >= r.set.total) state.sel = -1;
     wrap.dataset.total = r.set ? String(r.set.total) : '0';
-    fillInfo(); fillBox(); fillList(true); firstLoad();
+    fillInfo(); fillBox(); layout(); fillList(true); firstLoad();
   }
   let slT = 0;
   slider.addEventListener('input', () => {
@@ -305,17 +351,16 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     clearTimeout(slT); slT = setTimeout(() => { changeShown(); fillList(); }, 60); // live label, debounced redraw
   });
   const pt = ev => { const b = over.getBoundingClientRect(); return [ev.clientX - b.left, ev.clientY - b.top]; };
-  over.addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse') return; const [x, y] = pt(ev); setHover(nearestAt(x, y, 10)); });
-  over.addEventListener('pointerleave', () => setHover(-1));
+  function pickAt(x, y, tol) { const r = nearestAt(x, y, tol); if (r >= 0) select(r, nodeNear(r, y)); else clearSel(); }
   let down = null; // touch/pen: tap on pointerup if the finger hardly moved (a bigger move is the native scroll)
-  over.addEventListener('pointerdown', ev => { if (ev.pointerType === 'mouse') { const [x, y] = pt(ev); const r = nearestAt(x, y, 10); setHover(r); if (r >= 0) select(r); } else down = { x: ev.clientX, y: ev.clientY, sy: window.scrollY }; });
+  over.addEventListener('pointerdown', ev => { if (ev.pointerType === 'mouse') { const [x, y] = pt(ev); pickAt(x, y, 10); } else down = { x: ev.clientX, y: ev.clientY, sy: window.scrollY }; });
   over.addEventListener('pointercancel', () => { down = null; });
   over.addEventListener('pointerup', ev => { if (!down || ev.pointerType === 'mouse') return; const moved = Math.hypot(ev.clientX - down.x, ev.clientY - down.y) + Math.abs(window.scrollY - down.sy); down = null;
-    if (moved > TAP_SLOP) return; const [x, y] = pt(ev); const r = nearestAt(x, y, 18); setHover(r); if (r >= 0) select(r); });
+    if (moved > TAP_SLOP) return; const [x, y] = pt(ev); pickAt(x, y, 18); });
   // scroll: move the viewport, redraw the visible part of the static layer once per frame, refresh the list (throttled)
   let scRaf = 0, lsT = 0;
   const onScroll = () => { if (scRaf) return; scRaf = requestAnimationFrame(() => { scRaf = 0; if (!L || !alive) return; L.sy = offset(); wrap.dataset.sy = String(Math.round(L.sy));
-    const t = performance.now(); redrawBase(); perf.scroll.push(performance.now() - t); setHover(-1); kick(); clearTimeout(lsT); lsT = setTimeout(() => fillList(), 120); }); };
+    const t = performance.now(); redrawBase(); perf.scroll.push(performance.now() - t); kick(); clearTimeout(lsT); lsT = setTimeout(() => fillList(), 120); }); };
   window.addEventListener('scroll', onScroll, { passive: true });
   let rsT = 0; const onResize = () => { clearTimeout(rsT); rsT = setTimeout(() => { layout(); redrawBase(); fillList(true); kick(); }, 120); };
   window.addEventListener('resize', onResize);
@@ -326,7 +371,8 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     scroller: () => scroller, fillList: () => fillList(true), hover: () => hover,
     maxScroll: () => L.CH - L.H,
     scrollTo: y => new Promise(res => { window.scrollTo(0, Math.round(content.getBoundingClientRect().top + window.scrollY - headerH() + y)); requestAnimationFrame(() => requestAnimationFrame(() => { fillList(); res(L.sy); })); }),
-    setData: set => { state.set = set; state.status = 'ok'; state.from = 'test data'; wrap.dataset.total = String(set.total); fillInfo(); fillBox(); lastN = n(); index = null; wave = drawIn = fading = null; redrawBase(); fillList(true); kick(); },
+    setData: set => { state.set = set; state.status = 'ok'; state.from = 'test data'; wrap.dataset.total = String(set.total); fillInfo(); fillBox(); layout(); lastN = n(); index = null; wave = drawIn = fading = null; redrawBase(); fillList(true); kick(); },
+    goToVerse, clearSel,
     redrawBase: () => new Promise(res => redrawBase(n(), res)) };
 
   layout(); fillInfo(); fillBox(); setPlaying(state.playing);

@@ -37,11 +37,16 @@ main.wide { max-width: 1400px; }
 .xr-share { width: 100%; box-sizing: border-box; font: inherit; font-size: .95em; background: #000; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 6px; resize: vertical; }
 .xr-over { cursor: pointer; }
 .xr-ruler { position: absolute; left: 0; top: 0; bottom: 0; border-right: 2px solid #fff; z-index: 2; background: #000; }
-.xr-tick { position: absolute; left: 0; right: 0; min-height: 0; min-width: 0; padding: 0 6px 0 10px; border: 0; border-radius: 0; background: transparent;
-  border-top: 1px solid #555; color: #fff; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; }
+.xr-tick { position: absolute; left: 0; right: 0; min-height: 0; min-width: 0; padding: 0 6px 0 12px; border: 0; border-radius: 0; background: transparent;
+  border-top: 1px solid #555; color: #fff; font-size: 12px; line-height: 1.15; display: flex; align-items: center; justify-content: flex-start; overflow: hidden; text-align: left; }
 .xr-tick::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--g); }
-.xr-tick.tiny { font-size: 0; }
+.xr-tick.open { background: #222; }
 .xr-tick:active, .xr-tick:focus-visible { background: #333; }
+.xr-chaps { position: absolute; left: 0; right: 0; z-index: 3; box-sizing: border-box; background: #000; border: 2px solid #fff; border-radius: 8px; padding: 4px;
+  display: flex; flex-wrap: wrap; gap: 4px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.xr-chap { min-height: 36px; min-width: 36px; flex: 1 0 36px; max-width: calc(25% - 4px); margin: 0; padding: 2px 4px; font-size: 12px;
+  border: 1px solid #555; border-radius: 8px; background: #000; color: #fff; }
+.xr-chap:active, .xr-chap:focus-visible { border-color: #ffe81f; background: #222; }
 .xr-ctl { display: flex; gap: 10px; align-items: flex-end; margin: 4px 0; } .xr-ctl .xr-sl { flex: 1; } .xr-ctl button { min-height: 44px; flex: none; }
 /* landscape (iPad): tighter top boxes so the map starts higher */
 @media (orientation: landscape) and (max-height: 900px) {
@@ -60,7 +65,7 @@ main.wide { max-width: 1400px; }
 @media (orientation: portrait) { .xr-body { grid-template-columns: minmax(0, 1fr) 260px; } }
 @media (max-width: 760px) { .xr-top, .xr-body { grid-template-columns: 1fr; } .xr-side { position: static; height: 46vh; } }
 .xr-text:has(.text-status) { max-height: none; overflow: visible; }
-.xr-tick span { white-space: nowrap; }
+.xr-tick span { white-space: normal; overflow: hidden; }
 /* Link of the Day: two scrollable verse boxes (source, target); ephemeral, text from data/kjv-crosswire.json */
 .xr-vboxes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0; }
 .xr-vbox { max-height: 7.5em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; border: 1px solid #555; border-radius: 8px; padding: 4px 8px; font-size: .85em; background: #000; }

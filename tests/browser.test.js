@@ -122,7 +122,8 @@ test('browser: Cross Ref Map loads a synthetic refs file, slider sets minimum vo
   eq($('#xr-save'), null, 'Save for later removed');
   ok($('#xr-status').compareDocumentPosition($('#xr-map')) & 2, 'status/help box is below the map');
   ok(/Data status/.test($('#xr-status').textContent) && /data\/manifest\.json/.test($('#xr-status').textContent) && !/Google/.test($('#xr-status').textContent) && $('#xr-status').contains($('.xr-src')), 'data status at the bottom, no Google');
-  d.querySelector('.xr-tick[data-book="0"]').click(); ok(/^Genesis|→ .*Genesis/.test($('#xr-link-ref').textContent) || /Genesis/.test($('#xr-link-ref').textContent), 'ruler tap selects a Genesis link');
+  d.querySelector('.xr-tick[data-book="0"]').click(); eq(d.querySelectorAll('#xr-chaps .xr-chap').length, 50, 'tapping Genesis expands to 50 chapters');
+  eq($('#xr-chaps').getAttribute('aria-label'), 'Chapters of Genesis');
   // tap the selected arc's apex on the canvas
   const W = f.contentWindow, st = W.__xref.state(), L = W.__xref.layout();
   eq(W.localStorage.getItem('kjv-site.xrefSaved.v1'), null, 'nothing saved (ephemeral)');
@@ -241,9 +242,11 @@ test('browser: Cross Ref Map side list shows the visible range by votes, scrolls
   ok(/to Revelation/.test(d.querySelector('#xr-list-h').textContent), 'list follows the map to Revelation: ' + d.querySelector('#xr-list-h').textContent);
   const end = ranks(); ok(end.join() !== top.join(), 'rows change with the visible range');
   const row = list.querySelector('.xr-row'), r = Number(row.dataset.rank);
-  row.dispatchEvent(new W.PointerEvent('pointerenter', { pointerType: 'mouse' })); eq(X.hover(), r, 'hovering a row highlights that arc');
-  row.dispatchEvent(new W.PointerEvent('pointerleave', { pointerType: 'mouse' })); eq(X.hover(), -1);
+  row.dispatchEvent(new W.PointerEvent('pointerenter', { pointerType: 'mouse' })); eq(X.hover(), -1, 'hovering a row does not highlight');
   row.click(); eq(X.state().sel, r, 'tapping a row selects that arc'); ok(row.classList.contains('on'));
+  const ov = d.querySelector('.xr-over'), bb = ov.getBoundingClientRect();
+  ov.dispatchEvent(new W.PointerEvent('pointerdown', { pointerType: 'mouse', clientX: bb.left + 20, clientY: bb.top + 20, bubbles: true }));
+  eq(X.state().sel, -1, 'clicking empty space clears the highlight');
   const l = (await import('../js/xref/xrefs.js')).linkAt(X.state().set, r);
   eq(d.querySelector('#xr-link-ref').textContent, `${l.fromRef} → ${l.toRef}`, 'row fills the Link of the Day');
   ok(/Link of the Day: .*OpenBible\.info/.test(d.querySelector('#xr-share').value) && !/votes|rank/i.test(d.querySelector('#xr-share').value), 'prepared share text, no send');

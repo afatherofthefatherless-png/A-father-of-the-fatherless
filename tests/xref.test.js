@@ -96,3 +96,27 @@ test('xref: real file: 29,364 OSIS starting verses = 29,363 KJV verses (3 John 1
   const fs = await import('node:fs'), p = '/workspace/xref/cross_references.txt'; if (!fs.existsSync(p)) return;
   eq(X.fileInfo(X.parseRefs(fs.readFileSync(p, 'utf8'))).starts, 29363);
 });
+
+test('xref: book connection counts, chapter starts, and connection-weighted book bands', () => {
+  const s = X.parseRefs(SAMPLE);
+  const c = X.bookConnectionCounts(s);
+  eq(c.length, 66); eq(c[0], 3, 'Genesis is in three refs'); eq(c[1], 1, 'Exodus'); eq(c[18], 1, 'Psalms');
+  eq(c[42], 3, 'John'); eq(c[44], 1, 'Romans'); eq(c[57], 1, 'Hebrews'); eq(c[63], 1, '3 John'); eq(c[65], 1, 'Revelation');
+  eq(c[2], 0, 'Leviticus is unused in the sample');
+  const same = { total: 1, from: new Int32Array([0]), to: new Int32Array([1]), toEnd: new Int32Array([2]), votes: new Int32Array([1]) };
+  eq(X.bookConnectionCounts(same)[0], 1, 'a ref that stays in one book counts once');
+  eq(X.chapterStart(0, 1), 0); eq(X.chapterStart(0, 2), 31); eq(X.chapterStart(65, 22), 31102 - 21);
+  deepEq(X.ranksTouching(s, s.total, 0), [0, 2, 5], 'links that touch Genesis 1:1');
+  const minH = X.BOOK_MIN_H, bands = X.bookBands(c, 4000, minH);
+  ok(bands.h >= 66 * minH && Math.abs(bands.h - Math.max(4000, 66 * minH)) < 1e-6, 'total height is the requested size or the minimum');
+  for (let i = 0; i < 66; i++) ok(bands.heights[i] >= minH - 1e-9, 'book ' + i + ' is tappable');
+  ok(bands.heights[0] > bands.heights[2], 'Genesis (3 connections) is taller than Leviticus (none)');
+  ok(bands.heights[0] === bands.heights[42], 'equal connection counts get equal height');
+  const L = { top: 8, h: bands.h, sy: 0, bands, y: g => X.verseY(g, bands, 8), verseAt: y => X.verseAtY(y, bands, 8) };
+  const g0 = X.BOOK_START[0], g1 = X.BOOK_START[1];
+  ok(Math.abs(L.y(0) - (8 + (0 + 0.5 - g0) / (g1 - g0) * bands.heights[0])) < 1e-6, 'verseY matches the band formula');
+  eq(L.verseAt(L.y(0)), 0); eq(L.verseAt(8 + bands.y0[65] + 1), X.BOOK_START[65]);
+  const [a, b] = X.visibleRange({ ...L, H: 500, verseAt: y => X.verseAtY(y, bands, 8) });
+  eq(a, 0); ok(b > 0 && b < 31102, 'visibleRange uses verseAt: ' + b);
+});
+

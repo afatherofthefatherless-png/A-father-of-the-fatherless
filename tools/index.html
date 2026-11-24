@@ -1,29 +1,24 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#000000">
-<title>KJV reading site</title>
-<link rel="preload" href="assets/fonts/opendyslexic-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/site.css">
-<link rel="stylesheet" href="assets/css/recorder.css">
-<link rel="stylesheet" href="assets/css/xref.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Redirecting…</title>
+<script>
+(function () {
+  var q = location.search || "";
+  var hash = location.hash || "";
+  if (/^#\/xref(?:\?.*)?$/i.test(hash)) {
+    location.replace("/A-father-of-the-fatherless/cross-refs/" + q);
+    return;
+  }
+  location.replace("https://afatherofthefatherless-png.github.io/kjv-recorder/recorder/" + q);
+})();
+</script>
 </head>
-<body>
-<header class="top"><div class="bar-in">
-  <div class="brandrow">
-    <a class="brand" href="#/home">KJV reading site</a>
-  </div>
-  <nav class="tabs" aria-label="Main">
-    <a href="#/home">Home</a>
-    <a href="#/record">Record</a>
-    <a href="#/stitch">Stitch</a>
-    <a href="#/xref">Cross refs</a>
-  </nav>
-</div></header>
-<div class="apps-bar"><nav class="apps" id="apps-nav" aria-label="Other apps"></nav></div>
-<main id="main"></main>
-<script type="module" src="js/app.js"></script>
+<body style="background:#000;color:#fff;font-family:sans-serif;padding:24px">
+<p>This page has moved.</p>
+<p><a href="https://afatherofthefatherless-png.github.io/kjv-recorder/recorder/" style="color:#fff">Open the Bible Reading Tracker and Recorder</a></p>
+<p><a href="/A-father-of-the-fatherless/cross-refs/" style="color:#fff">Open Cross Ref</a></p>
 </body>
 </html>

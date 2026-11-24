@@ -11,8 +11,12 @@
   var hash = location.hash || "";
   var prefix = ROOT + "/reader";
   var m = hash.match(/^#\/([A-Za-z0-9][A-Za-z0-9-]*)(?:\/(\d+)(?:\/(\d+))?)?\/?$/);
-  if (/^#\/(?:home|record|stitch|xref)(?:\?.*)?$/i.test(hash)) {
-    location.replace(ROOT + "/tools/" + hash);
+  if (/^#\/xref(?:\?.*)?$/i.test(hash)) {
+    location.replace(ROOT + "/cross-refs/" + location.search);
+    return;
+  }
+  if (/^#\/(?:home|record|stitch)(?:\?.*)?$/i.test(hash)) {
+    location.replace("https://afatherofthefatherless-png.github.io/kjv-recorder/recorder/" + location.search);
     return;
   }
   if (m && ["home","record","stitch","xref"].indexOf(m[1].toLowerCase()) === -1) {

@@ -6,8 +6,7 @@ Release 11 allowlist (everything else is blocked):
   data/openbible-cross-references.txt OpenBible.info cross-references (CC-BY), sha256 must equal PINNED_REFS_SHA256
   data/manifest.json                  names, sizes, sha256 and counts of the two files above
   data/README.md                      notes
-Any other file under data/ fails. reader/ (the Biblia Dyslexia offline reader, which carries the public-domain
-KJV text by Robin's decision of 22 Nov 2026) is exempt from the KJV-text check only; its media/base64 checks still apply.
+Any other file under data/ fails. reader/ (the live Biblia Dyslexia offline reader) and home-test/ (the unreleased homepage test, Robin's yes of 24 Nov 2026) are exempt from the KJV-text check only; their media/base64 checks still apply. The live site root and /reader/ are otherwise unchanged.
 Any other file in the site is scanned for KJV text (8-word shingles of
 read_aloud_text, one continuous stream so short verses and verse boundaries are covered), audio/video files,
 embedded audio/video data URIs and long base64 runs (>= 2000 chars) that could hide audio.
@@ -26,7 +25,7 @@ WORD = re.compile(r"[a-z]+(?:'[a-z]+)*")
 B64 = re.compile(r"[A-Za-z0-9+/]{2000,}={0,2}")
 MEDIA_EXT = {'.wav', '.mp3', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.webm', '.mp4', '.mov', '.aif', '.aiff', '.caf', '.wma', '.mkv', '.avi', '.m4v'}
 SKIP_DIRS = {'.git', 'node_modules'}
-KJV_EXEMPT_PREFIX = 'reader/'  # the only place outside data/ where KJV text may appear
+KJV_EXEMPT_PREFIXES = ('reader/', 'home-test/')  # only places outside data/ where KJV text may appear
 DEFAULT_KJV = '/workspace/kjv-crosswire/kjv-crosswire-verses.json'
 KJV_FILE, REFS_FILE, MANIFEST_FILE, README_FILE = 'kjv-crosswire.json', 'openbible-cross-references.txt', 'manifest.json', 'README.md'
 # Pinned: change only together with js/kjv/text-source.js TEXT_SHA256 and data/manifest.json.
@@ -100,7 +99,7 @@ def scan(root, shingles):
             if re.search(r'data:(audio|video)/', text, re.I): problems.append(f'{rel}: embedded media data URI')
             m = B64.search(text)
             if m: problems.append(f'{rel}: base64 run of {len(m.group(0))} chars at offset {m.start()} (possible embedded audio)')
-            if rel.startswith(KJV_EXEMPT_PREFIX): continue  # media/base64 still checked above; KJV text allowed here only
+            if rel.startswith(KJV_EXEMPT_PREFIXES): continue  # media/base64 still checked above; KJV text allowed here only
             w = words(text); hits = []
             for i in range(len(w) - N + 1):
                 vid = shingles.get(hash(tuple(w[i:i + N])))

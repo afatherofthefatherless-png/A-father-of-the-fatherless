@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Redirecting…</title>
+<script>
+(function () {
+  var ROOT = "/A-father-of-the-fatherless";
+  var path = location.pathname;
+  var hash = location.hash || "";
+  var prefix = ROOT + "/reader";
+  var m = hash.match(/^#\/([A-Za-z0-9][A-Za-z0-9-]*)(?:\/(\d+)(?:\/(\d+))?)?\/?$/);
+  if (/^#\/(?:home|record|stitch|xref)(?:\?.*)?$/i.test(hash)) {
+    location.replace(ROOT + "/tools/" + hash);
+    return;
+  }
+  if (m && ["home","record","stitch","xref"].indexOf(m[1].toLowerCase()) === -1) {
+    var d = ROOT + "/" + m[1].toLowerCase() + "/";
+    if (m[2]) d += m[2] + "/";
+    if (m[3]) d += "#" + m[3];
+    location.replace(d + location.search);
+    return;
+  }
+  if (path === prefix || path === prefix + "/" || path.indexOf(prefix + "/") === 0) {
+    var rest = (path === prefix || path === prefix + "/") ? "/" : path.slice(prefix.length);
+    if (rest.charAt(rest.length - 1) !== "/") rest += "/";
+    location.replace(ROOT + rest + location.search + hash);
+    return;
+  }
+})();
+</script>
+</head>
+<body style="background:#000;color:#fff;font-family:sans-serif;padding:24px">
+<p>That page was not found.</p>
+<p><a href="/A-father-of-the-fatherless/" style="color:#fff">Open Biblia Dyslexia</a></p>
+</body>
+</html>

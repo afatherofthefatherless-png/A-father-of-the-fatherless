@@ -1,0 +1,167 @@
+/* Biblia Dyslexia homepage (v1). Loaded AFTER reader.css; reuses its tokens and fonts. */
+:root{
+  --fs-welcome:48px; --fs-body:30px; --fs-tab:28px; --fs-book:28px; --fs-count:20px; --fs-foot:18px;
+  --tap-more:56px; --tap-big:64px; --row:72px; --radius:12px; --col:1256px; --gutter:32px;
+}
+@media (max-width:1100px){ :root{ --fs-welcome:44px; --fs-body:28px; --col:960px; } }
+@media (max-width:600px){ :root{ --fs-welcome:40px; --fs-body:28px; --fs-tab:26px; --gutter:16px; } }
+
+/* Homepage scrolls as a normal document: no fixed-height wrapper, no inner scroll box */
+body.home, body.more{height:auto;min-height:100%}
+body.home .site-wrapper, body.more .site-wrapper{display:block;height:auto}
+
+/* Header: brand left, More right. Nothing else. */
+.home-header{display:flex;justify-content:space-between;align-items:center;gap:16px;width:100%;max-width:1320px;margin:0 auto;padding:12px var(--gutter);border-bottom:var(--stroke) solid var(--line)}
+.home-brand{font-weight:700;font-size:28px;line-height:1.3;text-decoration:none;white-space:nowrap}
+.more-btn{display:inline-flex;align-items:center;gap:12px;height:var(--tap-more);padding:0 18px;border:var(--stroke) solid var(--text);border-radius:var(--radius);background:var(--bg);color:var(--text);font:inherit;font-size:22px;font-weight:700;cursor:pointer;flex:none}
+.more-btn svg{width:26px;height:26px;flex:none}
+
+/* Reading column */
+.home-main{width:100%;max-width:calc(var(--col) + 2 * var(--gutter));margin:0 auto;padding:40px var(--gutter) 0}
+.welcome{max-width:42ch;font-size:var(--fs-body)}
+.welcome h1{margin:0 0 20px;font-size:var(--fs-welcome);font-weight:700;line-height:1.25}
+.welcome p{margin:0 0 12px;font-size:var(--fs-body);line-height:1.6;text-align:left}
+.welcome p.sub{color:var(--muted);font-size:24px}
+
+/* Welcome verse (Psalm 119:105): quiet 2px #555 bar on the left edge */
+.welcome-verse{margin:28px 0 0;padding:4px 0 4px 24px;border-left:var(--stroke) solid var(--line)}
+.welcome .welcome-verse p.wv-text{margin:0 0 8px;font-size:var(--fs-body);font-style:normal;font-weight:400;color:var(--text);line-height:1.6}
+.welcome .welcome-verse p.wv-ref{margin:0;font-size:20px;color:var(--muted);line-height:1.4}
+@media (max-width:600px){ .welcome-verse{padding-left:16px} }
+
+/* Random verse */
+.random-btn{display:flex;align-items:center;justify-content:center;gap:16px;width:100%;min-height:var(--tap-big);margin:32px 0 40px;padding:8px 20px;border:var(--stroke) solid var(--text);border-radius:var(--radius);background:var(--bg);color:var(--text);font:inherit;font-size:var(--fs-tab);font-weight:700;line-height:1.3;text-align:center;text-decoration:none}
+.random-btn svg{width:32px;height:32px;flex:none}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 20px}
+.tab{min-height:var(--tap-big);padding:8px 12px;border:var(--stroke) solid var(--line);border-radius:var(--radius);background:var(--bg);color:var(--text);font:inherit;font-size:var(--fs-tab);font-weight:400;line-height:1.25;text-align:center;cursor:pointer}
+.tab[aria-selected="true"]{font-weight:700;border-color:var(--text);background:var(--panel)}
+
+/* Book grid: Bible order, full names, no headings */
+.books{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none}
+@media (max-width:1100px){ .books{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:600px){ .books{grid-template-columns:1fr} }
+.books a{display:flex;flex-direction:column;justify-content:center;min-height:96px;height:100%;padding:12px 20px;border:var(--stroke) solid var(--line);border-radius:var(--radius);background:var(--panel);text-decoration:none}
+.books .name{font-size:var(--fs-book);line-height:1.3}
+.books .count{font-size:var(--fs-count);line-height:1.4;color:var(--muted)}
+
+.home-foot{margin:48px 0 0;padding:24px 0 40px;border-top:var(--stroke) solid var(--line);color:var(--muted);font-size:var(--fs-foot)}
+
+/* More panel: full screen #000 */
+.more-title{margin:0;font-size:40px;font-weight:700;line-height:1.3}
+.more-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}
+.more-list a{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:var(--row);padding:8px 24px;border:var(--stroke) solid var(--line);border-radius:var(--radius);background:var(--panel);font-size:var(--fs-book);line-height:1.3;text-decoration:none}
+.more-list a svg{width:24px;height:24px;flex:none;color:var(--muted)}
+.more-list li.back{margin-top:24px}
+.more-list li.back a{border-color:var(--text);background:var(--bg);font-weight:700;justify-content:flex-start}
+
+/* Random landing (reader page): action row under the armorer header */
+.site-wrapper.with-actions{grid-template-rows:auto auto minmax(0,1fr)}
+.reader-actions{display:flex;gap:12px;width:100%;max-width:1320px;margin:0 auto;padding:12px;border-bottom:var(--stroke) solid var(--line)}
+.reader-actions a{display:inline-flex;align-items:center;gap:12px;min-height:var(--tap-more);padding:0 20px;border:var(--stroke) solid var(--text);border-radius:var(--radius);font-size:22px;font-weight:700;text-decoration:none}
+.reader-actions a svg{width:26px;height:26px;flex:none}
+.random-label{margin:18px 0 8px;padding-left:calc(2.4 * var(--fs-verse));font-size:20px;color:var(--muted);line-height:1.4}
+.verse.verse-random{border:var(--stroke) solid var(--text);border-radius:var(--radius);padding:12px 16px 12px 2.4em;margin-bottom:.8em}
+.verse.verse-random .verse-number{left:12px;top:calc(.35em + 12px)}
+.reader.scroll{overflow:hidden}
+
+/* Book page (chapter grid) with large numbers */
+.chapter-toc.large{gap:12px}
+.chapter-toc.large li{border-radius:var(--radius)}
+.chapter-toc.large a{min-width:96px;min-height:72px;font-size:28px}
+.book-page .chapter-count{margin:-8px 0 24px;color:var(--muted);font-size:22px}
+
+/* Phone: wrap, never shrink */
+@media (max-width:600px){
+  .home-brand{font-size:24px;white-space:normal;line-height:1.25}
+  .more-btn{gap:8px;padding:0 12px;font-size:20px}
+  .tabs{grid-template-columns:1fr}  /* "Testament" in Bold 26px is 192px; half the phone column is 175px, so tabs stack */
+  .random-btn{justify-content:flex-start;text-align:left}
+}
+
+/* ---- 24 Nov 09:23: homepage text centred (homepage + More panel only; reader pages stay left-aligned) ---- */
+body.home .welcome{max-width:42ch;margin:0 auto;text-align:center}
+body.home .welcome h1, body.home .welcome p{text-align:center;text-wrap:balance}
+body.home .welcome-verse{margin:32px auto 0;padding:32px 0 0;border-left:0;position:relative}
+body.home .welcome-verse::before{content:"";position:absolute;top:0;left:50%;width:120px;margin-left:-60px;border-top:var(--stroke) solid var(--line)}
+body.home .welcome .welcome-verse p.wv-text{text-wrap:balance}
+@media (max-width:600px){ body.home .welcome-verse{padding-left:0} body.home .random-btn{justify-content:center;text-align:center} }
+body.home .random-btn span{text-wrap:balance}
+body.home .tab{text-align:center}
+body.home .books a{align-items:center;text-align:center}
+body.home .books .name{text-wrap:balance}
+body.home .home-foot{text-align:center}
+/* More panel: title centred between equal side columns; row labels stay left for scanning */
+body.more .home-header{display:grid;grid-template-columns:1fr auto 1fr}
+body.more .home-header::before{content:""}
+body.more .more-title{text-align:center}
+body.more .more-btn{justify-self:end}
+@media (max-width:600px){ body.home .random-btn{flex-direction:column;gap:6px;padding:12px 16px} }
+body.home .home-foot{text-wrap:balance}
+@media (max-width:600px){ body.home .home-foot span{display:inline-block;max-width:270px} } /* avoids the orphan "Ministry" on the phone */
+
+/* ==== Flow layout (Robin, 24 Nov 11:28): home -> testament books -> book chapters -> reader ==== */
+/* Homepage entry tabs: both are doors (no selected state); same 64px+ boxes Robin said are fine */
+body.home .tabs.entry{margin:40px 0 28px}
+.tabs.entry .tab{display:flex;align-items:center;justify-content:center;min-height:72px;border-color:var(--text);background:var(--panel);font-weight:700;text-decoration:none}
+/* Verse of the day box (replaces the random-verse button) */
+.votd{display:block;margin:0 0 8px;padding:20px 24px 22px;border:var(--stroke) solid var(--line);border-radius:var(--radius);background:var(--bg);text-align:center;text-decoration:none}
+.votd span{display:block;text-wrap:balance}
+.votd-label{font-size:20px;color:var(--muted);line-height:1.4;margin-bottom:10px}
+.votd-text{font-size:var(--fs-body);line-height:1.6;max-width:42ch;margin:0 auto}
+.votd-ref{font-size:20px;color:var(--muted);line-height:1.4;margin-top:8px}
+/* Flow pages: Back + centred title, nothing else */
+.flow-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;width:100%;max-width:1320px;margin:0 auto;padding:16px var(--gutter) 8px}
+.back-btn{justify-self:start;display:inline-flex;align-items:center;gap:10px;min-height:var(--tap-more);padding:0 20px 0 14px;border:var(--stroke) solid var(--text);border-radius:var(--radius);font-size:22px;font-weight:700;text-decoration:none}
+.flow-title{margin:0;font-size:var(--fs-h1);font-weight:700;line-height:1.25;text-align:center;white-space:nowrap}
+.home-main.flow{padding-top:16px;padding-bottom:40px}
+/* Compact book boxes: full names, never abbreviated, no chapter-count line */
+.books.compact{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:1100px){ .books.compact{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:600px){ .books.compact{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} }
+.books.compact a{flex-direction:row;align-items:center;justify-content:center;min-height:64px;padding:6px 10px;border-radius:10px;font-size:24px;line-height:1.25;text-align:center;text-wrap:balance}
+@media (max-width:600px){ .books.compact a{font-size:20px;padding:6px 6px} }
+/* Chapter number grid */
+.chapter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.chapter-grid a{display:flex;align-items:center;justify-content:center;min-height:64px;border:var(--stroke) solid var(--line);border-radius:10px;background:var(--panel);font-size:28px;text-decoration:none}
+/* Desktop: wider measure in the verse-of-the-day box and tighter rhythm so the whole homepage fits in 900px */
+@media (min-width:1101px){
+  body.home .home-main{padding-top:28px}
+  body.home .tabs.entry{margin:32px 0 20px}
+  .votd{padding:16px 24px 18px}
+  .votd-text{max-width:58ch}
+  .votd-label{margin-bottom:6px}
+}
+@media (max-width:600px){ .votd{padding:16px 12px 18px} .votd span.votd-text{text-wrap:pretty} } /* balance stops after 6 lines; pretty avoids a lone last word */
+@media (min-width:1101px){ body.home .welcome-verse{margin-top:24px;padding-top:24px} body.home .welcome h1{margin-bottom:14px} }
+/* 12:10: phone verse of the day uses balance (works up to 6 lines in Chrome; Psalm 68:5 is 6). Longer entries: see DESIGN.md orphan guard */
+@media (max-width:600px){ .votd span.votd-text{text-wrap:balance} }
+/* Study panel rows = Robin's GitHub Pages (13:53): name + muted path under it */
+.more-list .row-text{display:flex;flex-direction:column;min-width:0}
+.more-list .row-name{font-size:var(--fs-book);line-height:1.3}
+.more-list .row-url{font-size:20px;line-height:1.4;color:var(--muted);overflow-wrap:normal}
+.more-list a{padding-top:12px;padding-bottom:12px}
+@media (max-width:600px){ .more-list .row-url{display:none} } /* paths do not fit large print on the phone */
+
+
+@font-face{font-family:"OpenDyslexic";src:url("../fonts/opendyslexic-latin-400-italic.woff2") format("woff2");font-weight:400;font-style:italic;font-display:block}
+@font-face{font-family:"OpenDyslexic";src:url("../fonts/opendyslexic-latin-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:block}
+
+/* Test-site additions: overlay Study panel, scrolling reader, verse ring without dimming */
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.study-panel[hidden]{display:none !important}
+.study-panel{position:fixed;inset:0;z-index:200;background:var(--bg);overflow:auto}
+body.more{overflow:hidden}
+body.reader-page{height:100%}
+body.reader-page .site-wrapper.with-actions{height:100dvh}
+body.reader-page .reader{overflow:auto;-webkit-overflow-scrolling:touch}
+body.reader-page .has-focus .verse{opacity:1}
+body.reader-page .verse.verse-focused{
+  border:var(--stroke) solid var(--text);border-radius:var(--radius);
+  padding:12px 16px 12px 2.4em;
+}
+body.reader-page .verse.verse-focused .verse-number{left:12px;top:calc(.35em + 12px)}
+.reader-error{padding:24px 12px;font-size:var(--fs-body);max-width:42ch}
+.brand-name{font-weight:700}
+html,body{hyphens:none;word-break:normal;overflow-wrap:normal}

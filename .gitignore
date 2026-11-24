@@ -1,9 +1,9 @@
-# data/: only these four files may be committed (scripts/check-no-kjv-text.py enforces it, kjv json sha256-pinned).
-data/*
-!data/kjv-crosswire.json
-!data/openbible-cross-references.txt
-!data/manifest.json
-!data/README.md
+# Old KJV reading site data, now under tools/data/ (scripts/check-no-kjv-text.py pins these).
+tools/data/*
+!tools/data/kjv-crosswire.json
+!tools/data/openbible-cross-references.txt
+!tools/data/manifest.json
+!tools/data/README.md
 # No recordings or rendered media in the repo.
 *.wav
 *.mp3
@@ -17,3 +17,4 @@ data/*
 *.webm
 node_modules/
 .DS_Store
+__pycache__/

@@ -1,134 +1,294 @@
-// App shell: hash router and views. Relative paths only (served from /A-father-of-the-fatherless/ on GitHub Pages).
-import { parsePassage, formatPassage, expandPassage, refOf, fileNameOf, passageStem } from './kjv/ref.js';
-import { Store, requestPersistentStorage } from './store/db.js';
-import { MemoryStore } from './store/memory.js';
-import { loadTextSource, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
-import { viewRecord as recordView, closeRecorder, recorderPoke } from './ui/record-view.js';
-import { viewXref, closeXref } from './ui/xref-view.js';
-import { openMic } from './recorder/capture.js';
-import { S, stitchBlockers } from './recorder/state.js';
-import { stitchPassage } from './stitch/stitch.js';
-import { gateReportMarkdown } from './stitch/gate.js';
-import { STITCH, OLD, OLD_APPS } from './config.js';
+/* Biblia Dyslexia homepage test app. Path base is the GitHub Pages folder. */
+const BASE = '/A-father-of-the-fatherless';
+const VOTD_START = { y: 2026, m: 11, d: 24 };
+const SV = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 
-const $ = (sel, root = document) => root.querySelector(sel);
-const h = (tag, attrs = {}, ...kids) => {
-  const e = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) { if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v); }
-  for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(String(k)));
-  return e;
-};
+const bookCache = new Map();
+let booksIndex = null;
 
-let store, text = new TextSource(), textStatus = { status: 'missing', message: MISSING_MESSAGE };
-
-async function init() {
-  try { store = new Store(); await store.getKv('ping'); } catch { store = new MemoryStore(); }
-  requestPersistentStorage();
-  // Forget what the older releases kept (file ids and their cached copies); data now comes from data/.
-  for (const k of ['textSource', 'textCache.v1', 'refsCache.v1']) store.setKv(k, null).catch(() => {});
-  // Release 12: forget the Drive-era keys too (folder ids, sign-in token). Nothing here talks to Google any more.
-  try { for (const k of ['kjv-site.textDriveFileId.v1', 'kjv-site.refsDriveFileId.v1', 'kjv-site.driveFolders.v1']) localStorage.removeItem(k); } catch {}
-  try { for (const k of Object.keys(sessionStorage)) if (k === 'kjv-site.drive-token.v1') sessionStorage.removeItem(k); } catch {}
-  reloadText().then(rerenderTextViews);   // not awaited: the page draws at once and shows "Loading the verse text…"
-  window.addEventListener('hashchange', render);
-  render();
-}
-/** Shared bar, second row: every older app, on every page (filled once; the header itself is in index.html). */
-function renderAppsNav() {
-  const nav = $('#apps-nav'); if (!nav || nav.childElementCount) return;
-  nav.append(h('span', { class: 'apps-label' }, 'Other apps:'),
-    ...OLD_APPS.map(([label, key]) => OLD[key].startsWith('#') ? h('a', { href: OLD[key] }, label) : h('a', { href: OLD[key], target: '_blank', rel: 'noopener' }, label, h('span', { class: 'ext', 'aria-hidden': 'true' }, ' \u2197'), h('span', { class: 'sr-only' }, ' (opens in a new tab)'))));
-}
-renderAppsNav();
-// ---------- Verse text (data/kjv-crosswire.json, served with the site) ----------
-let textLoading = null;
-/** Load (or re-check) the verse text from the checked IndexedDB copy or data/. text keeps its identity so an open Recorder sees it. */
-function reloadText() {
-  if (textLoading) return textLoading;
-  textLoading = (async () => {
-    const r = await loadTextSource({ store });
-    text.replaceWith(r.source); textStatus = r; try { window.dispatchEvent(new Event('kjv-text-changed')); } catch {}
-  })().finally(() => { textLoading = null; });
-  return textLoading;
-}
-function rerenderTextViews() { if (!store) return; const n = route().name; if (n === 'home') render(); else if (n === 'record') recorderPoke(); else if (n === 'xref') window.dispatchEvent(new Event('kjv-text-changed')); }
-/** One status line, shared by Home and Record. */
-function textStatusLine() {
-  if (textLoading && !text.loaded) return MESSAGES.loading;
-  return text.loaded ? `CrossWire KJV text loaded from ${text.label} (${text.map.size} verses).` : (textStatus.message || MISSING_MESSAGE);
-}
-/** Buttons that go with the status line (same on Home and Record). */
-function textActions() {
-  const s = textStatus.status;
-  if (s === 'error') return h('div', { class: 'row text-actions' }, h('button', { onclick: async () => { await reloadText(); rerenderTextViews(); } }, 'Try again'));
-  return h('div', { class: 'row text-actions' });
+function withBase(path) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${BASE}${p}`;
 }
 
-
-function route() {
-  const [path, qs] = (location.hash.replace(/^#/, '') || '/').split('?');
-  return { name: path.replace(/^\//, '') || 'home', params: new URLSearchParams(qs || '') };
+function londonDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(now);
+  const get = (t) => parts.find((p) => p.type === t).value;
+  return { y: +get('year'), m: +get('month'), d: +get('day') };
 }
 
-async function render() {
-  const r = route(), main = $('#main'); main.replaceChildren();
-  document.querySelectorAll('nav.tabs a').forEach(a => { const on = a.getAttribute('href').startsWith('#/' + r.name); a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  if (r.name !== 'record') await closeRecorder();
-  if (r.name !== 'xref') closeXref();
-  try {
-    if (r.name === 'record') return await recordView(main, { h, params: r.params, store, text, openMic, reloadText, textStatusLine, textStatus: () => textStatus });
-    if (r.name === 'stitch') return await viewStitch(main, r.params.get('passage'));
-    if (r.name === 'xref') return await viewXref(main, { h, store, text, textStatusLine, textActions });
-    return viewHome(main);
-  } catch (e) { main.append(h('p', { class: 'err' }, e.message)); }
+function dayNumber(date) {
+  const start = Date.UTC(VOTD_START.y, VOTD_START.m - 1, VOTD_START.d);
+  const cur = Date.UTC(date.y, date.m - 1, date.d);
+  return Math.floor((cur - start) / 86400000) + 1;
 }
 
-function passageForm(target, value = '') {
-  const inp = h('input', { type: 'text', value, placeholder: 'e.g. Genesis 3:14-19 or Psalm 23', 'aria-label': 'Passage' });
-  const err = h('span', { class: 'err' });
-  const go = ev => { ev.preventDefault(); try { location.hash = `#/${target}?passage=${encodeURIComponent(formatPassage(parsePassage(inp.value)))}`; } catch (e) { err.textContent = e.message; } };
-  return h('form', { class: 'row', onsubmit: go }, inp, h('button', { type: 'submit' }, target === 'record' ? 'Open recorder' : 'Open stitcher'), err);
+function votdIndex(n, total) {
+  return ((n - 1) % total + total) % total;
 }
 
-function viewHome(main) {
-  main.append(
-    h('h1', {}, 'KJV reading site'),
-    h('p', { class: 'lead' }, 'Record your own verse and save it to your own computer: one WAV file per verse, then join a passage with StitchBot. Nothing is uploaded.'),
-    h('section', { class: 'card' }, h('h2', {}, 'Record'), passageForm('record')),
-    h('section', { class: 'card' }, h('h2', {}, 'Stitch'), passageForm('stitch')),
-    h('section', { class: 'card' }, h('h2', {}, 'Verse text'),
-      h('p', { class: 'text-status' }, textStatusLine()), textActions()),
-  );
+async function loadBooksIndex() {
+  if (!booksIndex) {
+    const res = await fetch(withBase('/data/books.json'));
+    if (!res.ok) throw new Error('Could not load the book list');
+    booksIndex = await res.json();
+  }
+  return booksIndex;
 }
 
+async function loadBook(slug) {
+  if (!bookCache.has(slug)) {
+    bookCache.set(slug, fetch(withBase(`/data/books/${slug}.json`)).then((res) => {
+      if (!res.ok) throw new Error('Could not load this book');
+      return res.json();
+    }));
+  }
+  return bookCache.get(slug);
+}
 
-// ---------- StitchBot view ----------
-async function viewStitch(main, passage) {
-  if (!passage) { main.append(h('h1', {}, 'StitchBot'), passageForm('stitch')); return; }
-  const p = parsePassage(passage), label = formatPassage(p), ids = expandPassage(p);
-  main.append(h('h1', {}, `StitchBot: ${label}`), h('p', {}, `Joins the accepted take of each verse in verse order with a fixed ${STITCH.GAP_S} s gap. Output: ${passageStem(p)}.wav and .timings.json.`));
-  const files = new Map(), metaById = {};
-  for (const id of ids) { const t = await store.acceptedTake(id); if (t) { files.set(fileNameOf(id), t.wav); } }
-  const missing = ids.filter(id => !files.has(fileNameOf(id)));
-  if (missing.length) main.append(h('p', { class: 'err' }, `Not recorded yet: ${missing.map(refOf).join(', ')}. Stitching is blocked until every verse is recorded.`));
-  const out = h('div', {});
-  const run = async acceptWarnings => {
-    out.replaceChildren(h('p', {}, 'Checking…'));
-    const r = await stitchPassage(p, files, { acceptWarnings, textSource: text.loaded ? text : null, metaById });
-    out.replaceChildren(h('pre', { class: 'report' }, gateReportMarkdown(r.gate)), dl('gate-report.json', JSON.stringify(r.gate, null, 2), 'application/json'));
-    if (r.blocked) {
-      out.append(h('p', { class: 'err' }, r.blocked));
-      if (r.gate.overall === 'WARN') out.append(h('button', { onclick: () => run(true) }, 'OK the warnings and stitch'));
+async function fillVerseOfTheDay() {
+  const box = document.querySelector('a.votd');
+  if (!box) return;
+  const res = await fetch(withBase('/data/votd.json'));
+  if (!res.ok) return;
+  const list = await res.json();
+  const n = dayNumber(londonDate());
+  const entry = list[votdIndex(n, list.length)];
+  if (!entry) return;
+  box.href = withBase(`/${entry.slug}/${entry.chapter}/#${entry.verse_start}`);
+  box.querySelector('.votd-text').textContent = `\u201c${entry.text}\u201d`;
+  box.querySelector('.votd-ref').textContent = entry.reference;
+}
+
+function openStudy() {
+  const panel = document.getElementById('more');
+  if (!panel) return;
+  panel.hidden = false;
+  document.body.classList.add('more');
+  const close = panel.querySelector('.more-btn, [data-close-study]');
+  close?.focus();
+}
+
+function closeStudy() {
+  const panel = document.getElementById('more');
+  if (!panel || panel.hidden) return;
+  panel.hidden = true;
+  document.body.classList.remove('more');
+  document.querySelector('.home-header .more-btn')?.focus();
+}
+
+function bindStudy() {
+  const openBtn = document.querySelector('.home-header .more-btn[aria-controls="more"]');
+  const panel = document.getElementById('more');
+  if (!openBtn || !panel) return;
+  openBtn.addEventListener('click', openStudy);
+  panel.querySelector('.more-btn')?.addEventListener('click', closeStudy);
+  panel.querySelector('li.back a')?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    closeStudy();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !panel.hidden) {
+      ev.preventDefault();
+      closeStudy();
+    }
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function chapterHeading(book, chapter) {
+  const bookHref = withBase(`/${book.slug}/`);
+  const chHref = withBase(`/${book.slug}/${chapter}/`);
+  return `<h2 class="chapter-heading"><a href="${bookHref}">${escapeHtml(book.name)}</a><span aria-hidden="true"> ⟫ </span><a href="${chHref}">Chapter ${chapter}</a></h2>`;
+}
+
+function verseHtml(chapter, verse) {
+  const id = `v${chapter}-${verse.n}`;
+  const title = verse.title
+    ? `<p class="psalm-title">${escapeHtml(verse.title)}</p>`
+    : '';
+  const text = verse.title ? verse.body : verse.text;
+  return `${title}<p class="verse" id="${id}"><span class="verse-number">${verse.n}</span><span class="verse-text">${escapeHtml(text)}</span></p>`;
+}
+
+function chapterSection(book, chapter) {
+  const ch = book.chapters[chapter - 1];
+  if (!ch) return '';
+  const verses = ch.verses.map((v) => verseHtml(chapter, v)).join('');
+  return `<section class="chapter" data-chapter="${chapter}" id="${book.slug}-${chapter}">${chapterHeading(book, chapter)}<article>${verses}</article></section>`;
+}
+
+function scrollToVerse(chapter, verse) {
+  const el = document.getElementById(`v${chapter}-${verse}`);
+  if (!el) return;
+  el.classList.add('verse-focused');
+  const heading = el.closest('.chapter')?.querySelector('.chapter-heading');
+  const offset = (heading ? heading.getBoundingClientRect().height : 0) + 12;
+  const top = el.getBoundingClientRect().top + window.scrollY - offset;
+  const scroller = document.querySelector('.reader');
+  if (scroller) scroller.scrollTo({ top: el.offsetTop - offset, behavior: 'auto' });
+  else window.scrollTo({ top, behavior: 'auto' });
+}
+
+async function mountReader(root, slug, startChapter, startVerse) {
+  const book = await loadBook(slug);
+  const total = book.chapters.length;
+  let from = startChapter;
+  let to = Math.min(total, startChapter + 1);
+  root.innerHTML = '';
+  for (let ch = from; ch <= to; ch += 1) root.insertAdjacentHTML('beforeend', chapterSection(book, ch));
+  if (startVerse) {
+    requestAnimationFrame(() => scrollToVerse(startChapter, startVerse));
+  } else {
+    root.scrollTop = 0;
+  }
+
+  const maybeLoad = () => {
+    const last = root.querySelector('.chapter:last-child');
+    if (!last) return;
+    const lastCh = Number(last.dataset.chapter);
+    if (lastCh >= total) return;
+    const remain = last.getBoundingClientRect().bottom - root.getBoundingClientRect().bottom;
+    if (remain < 1200) {
+      to = lastCh + 1;
+      root.insertAdjacentHTML('beforeend', chapterSection(book, to));
+    }
+  };
+  root.addEventListener('scroll', maybeLoad, { passive: true });
+  maybeLoad();
+}
+
+function namesFor(book) {
+  const list = [book.name, book.slug.replace(/-/g, ' '), ...(book.aliases || [])];
+  return [...new Set(list.map((s) => s.toLowerCase().replace(/[.]/g, '').replace(/\s+/g, ' ').trim()))]
+    .sort((a, b) => b.length - a.length);
+}
+
+function parseReference(query, books) {
+  const normalized = query.toLowerCase().replace(/[.]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+  for (const book of books) {
+    for (const name of namesFor(book)) {
+      if (normalized === name) return { slug: book.slug, chapter: 1 };
+      if (!(normalized.startsWith(name) && /^\s*\d/.test(normalized.slice(name.length)))) continue;
+      const rest = normalized.slice(name.length).trim();
+      const match = rest.match(/^(\d+)(?::(\d+)(?:-(?:(\d+):)?(\d+))?)?$/);
+      if (!match) continue;
+      const chapter = Number(match[1]);
+      const verse = match[2] ? Number(match[2]) : undefined;
+      if (chapter < 1 || chapter > book.chapters) continue;
+      return { slug: book.slug, chapter, verse };
+    }
+  }
+  return null;
+}
+
+function bindSearch() {
+  const form = document.querySelector('.search-box');
+  const input = form?.querySelector('input[type="search"]');
+  if (!form || !input) return;
+  const go = async (ev) => {
+    ev?.preventDefault();
+    const books = await loadBooksIndex();
+    const hit = parseReference(input.value, books);
+    if (!hit) {
+      input.setCustomValidity('Type a place, for example John 3:16');
+      input.reportValidity();
       return;
     }
-    const tj = JSON.stringify(r.timings, null, 2);
-    out.append(h('audio', { controls: true, src: URL.createObjectURL(new Blob([r.wav], { type: 'audio/wav' })) }),
-      dl(r.wavName, r.wav, 'audio/wav'), dl(r.timingsName, tj, 'application/json'));
+    input.setCustomValidity('');
+    const hash = hit.verse ? `#${hit.verse}` : '';
+    location.href = withBase(`/${hit.slug}/${hit.chapter}/${hash}`);
   };
-  main.append(h('button', { onclick: () => run(false), disabled: missing.length ? true : false }, 'Run gate and stitch'), out);
-}
-function dl(name, data, type) {
-  return h('a', { class: 'dl', download: name, href: URL.createObjectURL(new Blob([data], { type })) }, `Download ${name}`);
+  input.form?.addEventListener('submit', go);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') go(ev);
+  });
+  const filter = form.querySelector('.book-filter');
+  const reader = document.querySelector('.reader[data-book]');
+  filter?.addEventListener('click', () => {
+    const slug = reader?.dataset.book;
+    const book = (booksIndex || []).find((b) => b.slug === slug);
+    if (book) {
+      input.value = `${book.name} `;
+      input.focus();
+    } else {
+      input.focus();
+    }
+  });
 }
 
-init().catch(e => { window.__bootError = e.message; console.error(e); });
+function parsePath() {
+  const raw = location.pathname.replace(/\/+$/, '') || '/';
+  const prefix = BASE.replace(/\/+$/, '');
+  let rest = raw.startsWith(prefix) ? raw.slice(prefix.length) : raw;
+  rest = rest.replace(/^\/+|\/+$/g, '');
+  const parts = rest ? rest.split('/') : [];
+  const hashVerse = location.hash.replace(/^#/, '');
+  const verse = /^\d+$/.test(hashVerse) ? Number(hashVerse) : undefined;
+  return { parts, verse };
+}
+
+function isToolHash(hash) {
+  return /^(#\/(?:home|record|stitch|xref))(?:\?.*)?$/i.test(hash || '');
+}
+
+function scriptureHash(hash) {
+  const match = (hash || '').match(/^#\/([A-Za-z0-9][A-Za-z0-9-]*)(?:\/(\d+)(?:\/(\d+))?)?\/?$/);
+  if (!match) return null;
+  const slug = match[1].toLowerCase();
+  if (['home', 'record', 'stitch', 'xref'].includes(slug)) return null;
+  let dest = withBase(`/${slug}/`);
+  if (match[2]) dest += `${match[2]}/`;
+  if (match[3]) dest += `#${match[3]}`;
+  return dest;
+}
+
+function redirectLegacyHash() {
+  const hash = location.hash || '';
+  if (isToolHash(hash)) {
+    location.replace(`${BASE}/tools/${hash}`);
+    return true;
+  }
+  const dest = scriptureHash(hash);
+  if (dest) {
+    location.replace(dest);
+    return true;
+  }
+  return false;
+}
+
+async function start() {
+  if (redirectLegacyHash()) return;
+  bindStudy();
+  bindSearch();
+  const root = document.querySelector('.reader[data-book]');
+  if (root) {
+    const slug = root.dataset.book;
+    const chapter = Number(root.dataset.chapter);
+    const { verse } = parsePath();
+    try {
+      await mountReader(root, slug, chapter, verse);
+    } catch (err) {
+      root.innerHTML = `<p class="reader-error">${escapeHtml(err.message || 'Could not open this chapter.')}</p>`;
+    }
+    return;
+  }
+  try {
+    await fillVerseOfTheDay();
+  } catch (err) {
+    console.warn(err);
+  }
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+else start();

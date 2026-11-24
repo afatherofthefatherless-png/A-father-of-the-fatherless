@@ -238,7 +238,37 @@ function parsePath() {
   return { parts, verse };
 }
 
+function isToolHash(hash) {
+  return /^(#\/(?:home|record|stitch|xref))(?:\?.*)?$/i.test(hash || '');
+}
+
+function scriptureHash(hash) {
+  const match = (hash || '').match(/^#\/([A-Za-z0-9][A-Za-z0-9-]*)(?:\/(\d+)(?:\/(\d+))?)?\/?$/);
+  if (!match) return null;
+  const slug = match[1].toLowerCase();
+  if (['home', 'record', 'stitch', 'xref'].includes(slug)) return null;
+  let dest = withBase(`/${slug}/`);
+  if (match[2]) dest += `${match[2]}/`;
+  if (match[3]) dest += `#${match[3]}`;
+  return dest;
+}
+
+function redirectLegacyHash() {
+  const hash = location.hash || '';
+  if (isToolHash(hash)) {
+    location.replace(`${BASE}/tools/${hash}`);
+    return true;
+  }
+  const dest = scriptureHash(hash);
+  if (dest) {
+    location.replace(dest);
+    return true;
+  }
+  return false;
+}
+
 async function start() {
+  if (redirectLegacyHash()) return;
   bindStudy();
   bindSearch();
   const root = document.querySelector('.reader[data-book]');

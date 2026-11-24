@@ -1,152 +1,20 @@
-# KJV reading site (v1)
+# Biblia Dyslexia
 
-This is a static site: plain HTML and ES modules, with no build step and no dependencies. It is meant for GitHub Pages at
-`https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/`, and every path in it is relative.
+The King James Bible, in large, clear OpenDyslexic letters. This is the live GitHub Pages site for A Father of the Fatherless Ministry, served at:
 
-It does three things:
+https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/
 
-- **Record** a passage one verse at a time. The site arms the mic, starts on your voice (or a tap), and you Stop, review, then Accept or Re-record.
-- **Save** each accepted verse to your own device as `Genesis 3-14.wav` (mono, 16-bit, 48 kHz). Nothing is uploaded; the site talks to no Google service (release 12).
-- **StitchBot** runs the pass/fail gate, then joins the verses in order with a fixed gap. It outputs `Genesis 3-14 to 3-19.wav` and `Genesis 3-14 to 3-19.timings.json`.
+The homepage is the Bible: a short welcome, the verse of the day, and Old and New Testament book lists. A chapter opens the reader at verse 1. The Study button on the homepage links to the other pages.
 
-The old pages (Tracker, Voice Recorder, Rolling Reader, Cross-refs, Concordance) are linked from Home and are not changed.
-This pass doesn't touch the tracker's localStorage keys at all.
+Verse text comes from the verified KJV repository (`text` field). The wording is unchanged. The verse of the day is chosen at view time by the Europe/London date, from 24 November 2026 = Day 1.
 
-## Data in this repo (release 11)
+## Paths
 
-The site now hosts its own data in `data/` (see `data/README.md`). No Google sign-in or Picker is used for text or refs.
+- `/` — Biblia Dyslexia homepage
+- `/old-testament/`, `/new-testament/`, `/genesis/`, `/genesis/1/` — book and chapter pages
+- `/tools/` — the older KJV reading site (Record, Stitch, Cross refs)
+- `/concordance-of-even/` — Concordance of Even
+- `/reader/` — redirects to the equivalent homepage route (old book and chapter links still work)
+- `/home-test/` — earlier test build of the homepage, kept for now
 
-- `data/kjv-crosswire.json`: CrossWire KJV 3.1, 31,102 verses, `{ "verses": [ { "id", "read_aloud_text" } ] }`, 5,330,531 bytes,
-  sha256 `0641311b…c592` (pinned in `data/manifest.json`, `js/kjv/text-source.js` and the check script).
-- `data/openbible-cross-references.txt`: the OpenBible.info file, unchanged (8,303,003 bytes, 344,799 rows). **CC-BY, credit OpenBible.info.**
-- `data/manifest.json`: names, byte sizes, sha256 and counts. `data/README.md`: notes.
-
-How it loads (`js/data/repo-data.js`): fetch `data/manifest.json` (relative URL, so it works under
-`/A-father-of-the-fatherless/` and on localhost), fetch the file, check its sha256 with WebCrypto, keep it in IndexedDB
-keyed by checksum. Reloads use the stored copy (works offline); a file downloads again only when the manifest checksum
-changes. A failed fetch or checksum shows a plain error with **Try again**.
-
-Licensing of the hosted text (the CrossWire module says GPL) is Robin's decision. Geoblocking is not part of this build:
-GitHub Pages cannot geoblock, so it is left as a later decision.
-
-Run this before every push:
-
-    python3 scripts/check-no-kjv-text.py            # exit 0 means clean
-    python3 scripts/check-no-kjv-text.py --self-test
-
-The check allows only the four `data/` files, with the kjv json (and refs file) locked to pinned sha256s. It fails on any
-other file in `data/`, a modified kjv/refs file, KJV text anywhere else (8-word shingles), audio/video files (by name or
-magic bytes), audio/video data URIs and base64 runs of 2000+ characters. `--self-test` copies the tree and proves it passes
-clean and fails on each of those. Tests use only fake text and synthetic audio.
-
-## Recording a passage (Record tab)
-
-The Record tab is rebuilt on the old Voice Recorder (`transcript-tidier.html`): the same dark OpenDyslexic cards
-(`assets/css/recorder.css`, scoped under `.tt`), inside the shared site nav.
-
-1. **Passages to record.** The Reading Tracker's Record link opens `#/record?passage=…&next=…&chunks=n~ref|…`. The
-   recorder shows that list, marks the next one **Record this one next**, and keeps it on this device
-   (`kjv-site.trackerChunks.v1`). Tap a passage to open it. A passage that spans two books can't be one recording yet,
-   and the list says so. Typing a passage (`gen 3 14-16`, `Ps 23`, `1 cor 13:4`) or **Pick from the Bible** is the fallback.
-2. **Record / Stop / Send**, one verse at a time. Record again replaces the take (before or after Send). Send saves the
-   verse to this device as `Book C-V.wav` (for example `Genesis 3-14.wav`): a download (on iPad Safari it lands in
-   Files › Downloads), or **Share or Save to Files** where the browser can share files. The take is also kept in this
-   browser's storage (IndexedDB), so **Save again** works later, also from the verse list. A retake overwrites: one take
-   and one file name per verse, no version suffixes. (If a file with that name is already in Downloads, the browser
-   itself may add "(1)"; the site can't control that.)
-3. After the last verse, everything runs by itself and each step has its own line: WAV captured, saved to this device,
-   gate, stitched (0.4 s gap; the stitched WAV and its timings download to this device), MP4 rendered, MP4 saved.
-4. **The MP4 renderer is not in this repo.** The last two lines always say "waiting for renderer… Only the audio
-   exists." Robin asked to "save the video", but there is no video yet, only audio. Use **Download WAV** or **Send to
-   Rolling Reader** (which opens the old Reader; it only accepts audio from the old recorder's address, so it will not
-   take this file until the Reader is changed).
-
-Release 12 removed: Google sign-in, Drive upload and its queue, the Drive tab and badge, folder settings, "waiting"
-counts, the GIS/Picker scripts, the client id and API key, and the render-job JSON (nothing read it). Old Drive-era
-keys (`kjv-site.driveFolders.v1`, the sign-in token in sessionStorage) are cleared on load; the old 'uploads' store
-in IndexedDB is deleted (DB version 2).
-
-## Run locally
-
-    cd site && python3 -m http.server 8000     # open http://localhost:8000/
-
-You need a mic, and the page must be served over http://localhost or https.
-
-## Tests
-
-    node tests/run.mjs                  # 88 tests, Node 18+
-    python3 tests/browser-run.py        # 100 in headless Chrome with a fake mic (the shared tests plus IndexedDB, AudioWorklet capture, app boot and pages)
-
-The tests cover:
-
-- Filenames: a round trip for all 31,102 verses, Psalm/Psalms, cross-chapter ranges and the global index.
-- WAV encode/decode and BS.1770 loudness (997 Hz reference).
-- Onset detection on synthetic speech-like bursts, with silence, noise, clicks, breaths and the Stop tap.
-- Every gate pass/fail case, stitch timings and gaps, and the state machine.
-- The Recorder driven by a fake mic.
-- Saving to the device: the download link name, Save again, a failed download (take kept, message shown), one take per verse.
-- A check that no Google or Drive code is left in `js/`.
-- The rebuilt recorder: separate hyphen-named files per verse, Record again overwrites, Send saves the verse to the device, the
-  automated pipeline (stitched WAV + timings downloaded), tracker hand-off chunks and the next-passage choice, and the
-  Rolling Reader send's origin check.
-- In headless Chrome: no Google script, badge or wording on Record, the six step lines (renderer lines say waiting),
-  the tracker passage list, and a Record → Stop run with the fake mic.
-
-## Not tested yet
-
-- A real download / Share sheet on iPad Safari (only headless Chrome and emulated screen sizes were checked).
-- The MP4 renderer (not built) and the Rolling Reader accepting audio from the new site (needs a Reader change).
-- Real voice, real rooms, iPad/Safari (only emulated screen sizes were checked), Bluetooth mics, and a phone call or lock screen interrupting a recording.
-- The 44.1 kHz resample fallback (`OfflineAudioContext`), which only runs when the device won't open at 48 kHz.
-
-## Constants to tune with Robin (`js/config.js`)
-
-These are not settings in the app.
-
-- `STITCH.GAP_S` (0.4 s): the gap between verses.
-- `ONSET.*`: the trim (150 ms pre-roll, 250 ms tail, thresholds).
-- `GATE.wordsPerSecond` (2.5): this needs Robin's real reading rate.
-- The gate floor limits (pass ≤ -55 dBFS after loudness normalisation). A room at -65 dBFS raw comes out around -54 after
-  the gain to -16 LUFS, which is a WARN.
-
-## Rules the code follows
-
-- One file per verse. Recording a verse again overwrites it (`Genesis 3-14.wav`), on the device too: only the
-  accepted take is kept in IndexedDB. No version suffixes.
-- Nothing is uploaded. No sign-in, no client id, no API key, no secrets.
-- Already-posted videos are not touched. v1 has no re-render or import features.
-
-## Layout
-
-    index.html  assets/css/site.css   (look copied from the old apps; see the comment at the top of site.css)
-    assets/fonts/             OpenDyslexic 400/700 woff2 (same files the old apps embed) and OFL.txt (SIL OFL 1.1)
-    js/app.js                 router and views (#/, #/record, #/stitch, #/xref; an old #/drive link falls back to Home)
-    js/config.js              constants
-    js/kjv/                   books (counts only), ref/filename utilities, verse text from data/
-    js/recorder/              capture (AudioWorklet), onset, loudness, WAV, state machine, Recorder controller,
-                              pipeline (steps after Send), chunks (tracker passage list)
-    js/ui/record-view.js      the Record tab (old Voice Recorder layout); assets/css/recorder.css its styles
-    js/reader/handoff.js      Rolling Reader handoff (sharehtml Reader origin only)
-    js/stitch/                gate, StitchBot, hashes
-    js/save/device-save.js    save a file to this device (download link / share sheet), Save again
-    js/store/                 IndexedDB store (plus an in-memory store for tests)
-    tests/                    harness, synthetic audio, node and headless-Chrome runners
-    scripts/check-no-kjv-text.py
-
-Live test site: https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/
-
-### Cross Ref Map animations (release 8)
-Canvas has two layers: static arcs on the base canvas (drawn in batches, capped at 60,000), and everything that moves on an overlay canvas:
-1. Yellow (#ffe81f) dots travel source→target on the top 400 arcs in view; size and speed scale with votes.
-2. Slider moves: new arcs draw in over 0.4 s, dropped arcs fade over 0.2 s; more than 3,000 changed arcs → jump.
-3. Soft yellow glow pulses every 2 s on the top 200 arcs.
-4. First load: a wave reveals Genesis→Revelation over 1.5 s; aborted to the final state after 3 frames slower than 50 ms.
-5. Hover (mouse) / tap (touch): nearest arc found through a grid spatial index (`ArcIndex`), others dim, both verse refs labelled, 0.15 s fade.
-`prefers-reduced-motion: reduce` turns all of it off (Play button disabled, changes jump). Test-only emulation: `?motion=reduce` on localhost.
-
-## Cross-reference map (#/xref)
-The map scrolls from Genesis to Revelation (mouse, wheel or touch). The list on the right shows the links in view, ranked by votes. Hover or tap a row to highlight its arc and put it in Link of the Day. The info box has an OpenBible file-info note. The link box has a "Prepared for sharing" text box, but there is no send route yet. Only the visible part of the map is drawn.
-
-Release 10: the map is long (at least 4x the old one-screen height and at least 1.5x its width, so tall A4-ish proportions). You scroll the page itself down through it; the arcs and the side list stay in view. Link of the Day shows just the two refs, with a scrollable text box for each verse. The text comes only from your Drive KJV file; when it isn't loaded, the usual sign-in message shows. The box no longer shows rank or votes, and Save for later is gone. Drive load status and the file picker help are at the bottom of the page.
-
-Release 11: the verse text and the cross-references come from this site's `data/` folder (checked against `data/manifest.json`, kept on the device for offline use). No sign-in or file picker on the map; the bottom box is now "Data status".
+Nothing else should be published or deleted without Robin's explicit yes.

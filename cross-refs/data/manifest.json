@@ -1,0 +1,19 @@
+{
+  "generated": "2026-11-05",
+  "files": {
+    "kjv-crosswire.json": {
+      "bytes": 5330531,
+      "sha256": "0641311bd4407628c34ce43e769c75c8a1e67b29490df207dde87a050d31c592",
+      "verses": 31102,
+      "shape": "{verses:[{id,read_aloud_text}]}",
+      "source": "CrossWire KJV 3.1 (SWORD module, 2023-07-19), read_aloud_text field of kjv-crosswire-verses.json"
+    },
+    "openbible-cross-references.txt": {
+      "bytes": 8303003,
+      "sha256": "203e2bc2ae11de5c9745c86504fe3e32c841ac8a59a6453dc68d34614f69769a",
+      "rows": 344799,
+      "header_lines": 1,
+      "source": "OpenBible.info cross references (CC-BY), https://www.openbible.info/labs/cross-references/"
+    }
+  }
+}

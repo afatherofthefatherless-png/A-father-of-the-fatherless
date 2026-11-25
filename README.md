@@ -6,7 +6,7 @@ https://afatherofthefatherless-png.github.io/A-father-of-the-fatherless/
 
 The homepage is the Bible: a short welcome, the verse of the day, and Old and New Testament book lists. A chapter opens the reader at verse 1. The Study button on the homepage links to the other pages.
 
-Verse text comes from the verified KJV repository (`text` field). The wording is unchanged. The verse of the day is chosen at view time by the Europe/London date, from 24 November 2026 = Day 1.
+Verse text comes from the verified KJV repository (`text` field). The wording is unchanged. The verse of the day uses the same 150-verse list and date rule as the daily email: the Europe/London calendar date, counting days since 1 January 2026, then taking that number modulo 150.
 
 ## Paths
 

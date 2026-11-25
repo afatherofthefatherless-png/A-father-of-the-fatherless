@@ -1,6 +1,6 @@
 /* Biblia Dyslexia homepage test app. Path base is the GitHub Pages folder. */
 const BASE = '/A-father-of-the-fatherless';
-const VOTD_START = { y: 2026, m: 11, d: 24 };
+const VOTD_START = { y: 2026, m: 1, d: 1 }; // same date rule as the daily verse email
 const SV = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 
 const bookCache = new Map();

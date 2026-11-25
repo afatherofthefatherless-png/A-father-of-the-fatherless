@@ -75,6 +75,15 @@ button.vt .vr{flex:0 1 auto;font-weight:700;white-space:nowrap}
 .stnote h3{font-size:18px;margin:14px 0 6px;color:#ffd24d}
 .stnote ul{margin:6px 0;padding-left:24px}
 .stnote ol{margin:6px 0;padding-left:24px}
+.stnote li p{margin:8px 0 0}
+.stnote .sense-list{margin:8px 0 16px}
+.stnote .sense-block{margin:0 0 18px;padding:16px 0 8px;border-top:1px solid #555}
+.stnote .sense-list .sense-block:first-child{border-top:0;padding-top:4px}
+.stnote .sense-block > p{margin:0}
+.stnote .sense-block .gram{margin-top:14px}
+.stnote .d-sense{display:inline-block;margin:0 8px 0 0;padding:2px 10px;font-size:17px;vertical-align:baseline}
+.stnote .d-sense.reserved{background:transparent;color:#fff;border:2px solid #bbb}
+
 .empty{border:1px dashed #666;border-radius:10px;padding:12px 16px;color:#ddd;margin:8px 0}
 html{scroll-behavior:smooth;scroll-padding-top:12px}
 footer{margin-top:32px;font-size:15px;color:#ccc}
@@ -110,8 +119,7 @@ footer.credits p{margin:6px 0}footer.credits a{color:#fff;overflow-wrap:anywhere
 <p>Each &ldquo;<span class="ev">even</span>&rdquo; in the KJB text is shown in red. Hebrew and Greek words are <span class="orig">gold</span>, and Strong&rsquo;s concordance numbers are <span class="sn">H589</span> tags.</p>
 </header>
 <nav aria-label="Books"><a href="#b-genesis">Genesis <span class="n">(30)</span></a> <a href="#b-exodus">Exodus <span class="n">(45)</span></a> <a href="#b-leviticus">Leviticus <span class="n">(81)</span></a> <a href="#b-numbers">Numbers <span class="n">(79)</span></a> <a href="#b-deuteronomy">Deuteronomy <span class="n">(55)</span></a> <a href="#b-joshua">Joshua <span class="n">(51)</span></a> <a href="#b-judges">Judges <span class="n">(28)</span></a> <a href="#b-ruth">Ruth <span class="n">(3)</span></a> <a href="#b-1-samuel">1 Samuel <span class="n">(27)</span></a> <a href="#b-2-samuel">2 Samuel <span class="n">(30)</span></a> <a href="#b-1-kings">1 Kings <span class="n">(46)</span></a> <a href="#b-2-kings">2 Kings <span class="n">(37)</span></a> <a href="#b-1-chronicles">1 Chronicles <span class="n">(37)</span></a> <a href="#b-2-chronicles">2 Chronicles <span class="n">(40)</span></a> <a href="#b-ezra">Ezra <span class="n">(12)</span></a> <a href="#b-nehemiah">Nehemiah <span class="n">(22)</span></a> <a href="#b-esther">Esther <span class="n">(10)</span></a> <a href="#b-job">Job <span class="n">(21)</span></a> <a href="#b-psalms">Psalms <span class="n">(64)</span></a> <a href="#b-proverbs">Proverbs <span class="n">(16)</span></a> <a href="#b-ecclesiastes">Ecclesiastes <span class="n">(8)</span></a> <a href="#b-song-of-solomon">Song of Solomon <span class="n">(1)</span></a> <a href="#b-isaiah">Isaiah <span class="n">(90)</span></a> <a href="#b-jeremiah">Jeremiah <span class="n">(93)</span></a> <a href="#b-lamentations">Lamentations <span class="n">(1)</span></a> <a href="#b-ezekiel">Ezekiel <span class="n">(87)</span></a> <a href="#b-daniel">Daniel <span class="n">(29)</span></a> <a href="#b-hosea">Hosea <span class="n">(4)</span></a> <a href="#b-joel">Joel <span class="n">(5)</span></a> <a href="#b-amos">Amos <span class="n">(7)</span></a> <a href="#b-obadiah">Obadiah <span class="n">(4)</span></a> <a href="#b-jonah">Jonah <span class="n">(3)</span></a> <a href="#b-micah">Micah <span class="n">(12)</span></a> <a href="#b-nahum">Nahum <span class="n">(2)</span></a> <a href="#b-habakkuk">Habakkuk <span class="n">(3)</span></a> <a href="#b-zephaniah">Zephaniah <span class="n">(9)</span></a> <a href="#b-haggai">Haggai <span class="n">(1)</span></a> <a href="#b-zechariah">Zechariah <span class="n">(17)</span></a> <a href="#b-malachi">Malachi <span class="n">(9)</span></a> <a href="#b-matthew">Matthew <span class="n">(30)</span></a> <a href="#b-mark">Mark <span class="n">(18)</span></a> <a href="#b-luke">Luke <span class="n">(22)</span></a> <a href="#b-john">John <span class="n">(26)</span></a> <a href="#b-acts">Acts <span class="n">(14)</span></a> <a href="#b-romans">Romans <span class="n">(25)</span></a> <a href="#b-1-corinthians">1 Corinthians <span class="n">(22)</span></a> <a href="#b-2-corinthians">2 Corinthians <span class="n">(13)</span></a> <a href="#b-galatians">Galatians <span class="n">(7)</span></a> <a href="#b-ephesians">Ephesians <span class="n">(12)</span></a> <a href="#b-philippians">Philippians <span class="n">(7)</span></a> <a href="#b-colossians">Colossians <span class="n">(3)</span></a> <a href="#b-1-thessalonians">1 Thessalonians <span class="n">(15)</span></a> <a href="#b-2-thessalonians">2 Thessalonians <span class="n">(4)</span></a> <a href="#b-1-timothy">1 Timothy <span class="n">(2)</span></a> <a href="#b-2-timothy">2 Timothy <span class="n">(1)</span></a> <a href="#b-titus">Titus <span class="n">(2)</span></a> <a href="#b-philemon">Philemon <span class="n">(1)</span></a> <a href="#b-hebrews">Hebrews <span class="n">(7)</span></a> <a href="#b-james">James <span class="n">(5)</span></a> <a href="#b-1-peter">1 Peter <span class="n">(7)</span></a> <a href="#b-2-peter">2 Peter <span class="n">(4)</span></a> <a href="#b-1-john">1 John <span class="n">(11)</span></a> <a href="#b-2-john">2 John <span class="n">(0)</span></a> <a href="#b-3-john">3 John <span class="n">(2)</span></a> <a href="#b-jude">Jude <span class="n">(2)</span></a> <a href="#b-revelation">Revelation <span class="n">(13)</span></a></nav>
-<div class="vbar"><button type="button" id="expall">Open all verses</button><button type="button" id="colall">Close all verses</button><button type="button" id="colbooks">Close all books</button></div>
-<aside class="stnote" aria-labelledby="stn-h">
+<div class="vbar"><button type="button" id="expall">Open all verses</button><button type="button" id="colall">Close all verses</button><button type="button" id="colbooks">Cl<aside class="stnote" aria-labelledby="stn-h">
 <h2 id="stn-h">How to read the concordance</h2>
 <p>This page is a study of the word &ldquo;<span class="ev">even</span>&rdquo; in the KJB. The 30 Genesis entries below are <strong>Checked by hand</strong>. The other 1,364 occurrences are listed too, inside their book boxes, as <strong>drafts</strong>. Each one is marked &ldquo;Draft, not yet reviewed&rdquo;, and its commentary is left empty until it has been checked. The 30 checked entries are finished.</p>
 <p>Each row is headed by a <strong>Location</strong>, written as the full book name and a chapter:verse, for example Genesis 6:17.</p>
@@ -121,6 +129,11 @@ footer.credits p{margin:6px 0}footer.credits a{color:#fff;overflow-wrap:anywhere
 <li>The <strong>source type</strong> &mdash; where &ldquo;even&rdquo; comes from in the Hebrew or Greek: an added word, a prefix or suffix, or a word of its own.</li>
 </ul>
 <p>The sense never describes the source, and the source type never stands in for the sense.</p>
+
+<h3>What Strong&rsquo;s numbers are</h3>
+<p>James Strong was an American Bible scholar. In 1890 he published <em>The Exhaustive Concordance of the Bible</em>. It lists every word in the King James Bible and every verse where each word appears.</p>
+<p>Strong gave each Hebrew and Greek word of the original a number. Hebrew and Aramaic words run from <span class="sn">H1</span> to <span class="sn">H8674</span>. Greek words run from <span class="sn">G1</span> to <span class="sn">G5624</span>. The same original word always carries the same number, wherever it appears.</p>
+<p>This is why the numbers matter. You do not need to read Hebrew or Greek to follow a word back to its source. One English word can stand for several original words. One original word can be rendered by several English words. The number shows you which is which. Most Bible tools still use Strong&rsquo;s numbers today, more than a century later.</p>
 
 <h3>Source type: where &ldquo;even&rdquo; comes from</h3>
 <p>Three source types are used. The test is what, in the Hebrew or Greek, the &ldquo;even&rdquo; corresponds to: nothing, a small piece of a word, or a whole word.</p>
@@ -137,21 +150,61 @@ footer.credits p{margin:6px 0}footer.credits a{color:#fff;overflow-wrap:anywhere
 
 <h3>Sense: what &ldquo;even&rdquo; is doing</h3>
 <p>Every entry gets one sense label, according to what &ldquo;<span class="ev">even</span>&rdquo; is doing in the verse. The label describes the English sentence only. Where &ldquo;even&rdquo; came from is the source type above. When two labels could fit, the one listed first is used. Genesis uses six kinds:</p>
-<ul>
-<li><strong>Range</strong> means &ldquo;as far as&rdquo; or &ldquo;until&rdquo;, the reach of a distance or a time (Genesis 13:3, &ldquo;even to Bethel&rdquo;).</li>
-<li><strong>Comparison</strong> means &ldquo;like&rdquo; or &ldquo;as&rdquo;, setting one thing beside another (Genesis 13:10, the plain of Jordan &ldquo;even as the garden of the <span class="yhwh">LORD</span>&rdquo;).</li>
-<li><strong>Repeated person</strong> means a person is named or pointed at twice, the second time with &ldquo;even&rdquo; (Genesis 6:17, &ldquo;I, even I&rdquo;; Genesis 20:5, &ldquo;she, even she herself&rdquo;). Genesis 27:34, &ldquo;Bless me, <span class="ev">even</span> me also,&rdquo; is the same sense: the &ldquo;even&rdquo; is an added word, and the comparison with Jacob is carried by the Hebrew <span class="orig">gam</span> <span class="sn">H1571</span>, &ldquo;also&rdquo;. The same wording returns in Genesis 27:38.</li>
-<li><strong>Apposition</strong> means &ldquo;even&rdquo; introduces a phrase that restates or pins down what was just said. It may name who or what is meant (Genesis 19:9, &ldquo;the man, even Lot&rdquo;), give a number (Genesis 47:2, &ldquo;even five men&rdquo;), or say the same thing again with more detail (Genesis 49:22, &ldquo;a fruitful bough, even a fruitful bough&rdquo;).</li>
-</ul>
+<div class="sense-list">
+<div class="sense-block">
+<p><span class="d-sense">Range</span> means &ldquo;as far as&rdquo; or &ldquo;until&rdquo;, the reach of a distance or a time (Genesis 13:3, &ldquo;even to Bethel&rdquo;).</p>
+<p class="gram"><em>The grammar.</em> Here &ldquo;<span class="ev">even</span>&rdquo; works with a preposition (&ldquo;to&rdquo;, &ldquo;unto&rdquo;) to mark an end point. In Hebrew this is usually <span class="orig">&rsquo;ad</span>.</p>
+</div>
+<div class="sense-block">
+<p><span class="d-sense">Comparison</span> means &ldquo;like&rdquo; or &ldquo;as&rdquo;, setting one thing beside another (Genesis 13:10, the plain of Jordan &ldquo;even as the garden of the <span class="yhwh">LORD</span>&rdquo;).</p>
+<p class="gram"><em>The grammar.</em> &ldquo;<span class="ev">Even</span> as&rdquo; is a comparison phrase. &ldquo;<span class="ev">Even</span>&rdquo; sharpens &ldquo;as&rdquo;: not just similar, but truly like it.</p>
+</div>
+<div class="sense-block">
+<p><span class="d-sense">Repeated person</span> means a person is named or pointed at twice, the second time with &ldquo;even&rdquo; (Genesis 6:17, &ldquo;I, even I&rdquo;; Genesis 20:5, &ldquo;she, even she herself&rdquo;). Genesis 27:34, &ldquo;Bless me, <span class="ev">even</span> me also,&rdquo; is the same sense: the &ldquo;even&rdquo; is an added word, and the comparison with Jacob is carried by the Hebrew <span class="orig">gam</span> <span class="sn">H1571</span>, &ldquo;also&rdquo;. The same wording returns in Genesis 27:38.</p>
+<p class="gram"><em>The grammar.</em> The repeat is for emphasis. The speaker leans on the pronoun. It says: this one and no other.</p>
+</div>
+<div class="sense-block">
+<p><span class="d-sense">Apposition</span> means &ldquo;even&rdquo; introduces a phrase that restates or pins down what was just said. It may name who or what is meant (Genesis 19:9, &ldquo;the man, even Lot&rdquo;), give a number (Genesis 47:2, &ldquo;even five men&rdquo;), or say the same thing again with more detail (Genesis 49:22, &ldquo;a fruitful bough, even a fruitful bough&rdquo;).</p>
+<p class="gram"><em>The grammar.</em> Apposition means two phrases stand side by side and point to the same thing. The second phrase explains the first. In modern English we would use &ldquo;namely&rdquo; or &ldquo;that is&rdquo;. This label replaces the old labels Identifier and Repetition.</p>
+</div>
+</div>
 <p>Repeated person and Apposition are close cousins. Both name the same person or thing a second time. Apposition does it with new words, to say which one (Genesis 19:9, &ldquo;the man, <span class="ev">even</span> Lot&rdquo;; Genesis 47:2, &ldquo;some of his brethren, <span class="ev">even</span> five men&rdquo;). Repeated person says the same person again for emphasis (Genesis 6:17, &ldquo;I, <span class="ev">even</span> I&rdquo;; Genesis 20:5, &ldquo;she, <span class="ev">even</span> she herself&rdquo;). In Genesis, every Apposition &ldquo;even&rdquo; is an added word, put in by the translators, while most Repeated person entries translate a real Hebrew word for emphasis, <span class="orig">gam</span> (&ldquo;also, even&rdquo;). Genesis 10:21, &ldquo;<span class="ev">even</span> to him&rdquo;, sits on the line between the two.</p>
-<ul>
-<li><strong>Intensifier</strong> means &ldquo;even&rdquo; adds weight to a statement without repeating a person or naming a time (Genesis 34:29, &ldquo;spoiled even all that was in the house&rdquo;; Genesis 37:18, &ldquo;even before he came near unto them&rdquo;; Genesis 42:28, &ldquo;it is even in my sack&rdquo;).</li>
-<li><strong>Time: of day</strong> is the old English word for evening itself (Genesis 19:1, &ldquo;at even&rdquo;). It is the only entry where &ldquo;even&rdquo; literally means time. The Hebrew noun behind it is <span class="orig">&rsquo;ereb</span> <span class="sn">H6153</span>, so the source type is Whole word.</li>
-</ul>
-<p>Two more labels are reserved for later books. <strong>Level</strong> will mean the adjective or verb sense of flat or equal (for example &ldquo;an even balance&rdquo;). <strong>Other</strong> is a holding label for anything that fits nothing else, to be reviewed at the end of each book.</p>
+<div class="sense-list">
+<div class="sense-block">
+<p><span class="d-sense">Intensifier</span> means &ldquo;even&rdquo; adds weight to a statement without repeating a person or naming a time (Genesis 34:29, &ldquo;spoiled even all that was in the house&rdquo;; Genesis 37:18, &ldquo;even before he came near unto them&rdquo;; Genesis 42:28, &ldquo;it is even in my sack&rdquo;).</p>
+<p class="gram"><em>The grammar.</em> Here &ldquo;<span class="ev">even</span>&rdquo; works as an adverb of emphasis. Take it out and the sentence still stands, but it loses its force. This is closest to how we use &ldquo;<span class="ev">even</span>&rdquo; today.</p>
+</div>
+<div class="sense-block">
+<p><span class="d-sense">Time: of day</span> is the old English word for evening itself (Genesis 19:1, &ldquo;at even&rdquo;). It is the only entry where &ldquo;even&rdquo; literally means time. The Hebrew noun behind it is <span class="orig">&rsquo;ereb</span> <span class="sn">H6153</span>, so the source type is Whole word.</p>
+<p class="gram"><em>The grammar.</em> This &ldquo;<span class="ev">even</span>&rdquo; is a noun, not an adverb. It does not compare or stress anything. It names a time of day. It is the only sense where &ldquo;<span class="ev">even</span>&rdquo; means time itself.</p>
+</div>
+<div class="sense-block">
+<p>Two more labels are reserved for later books. <span class="d-sense reserved">Level</span> will mean the adjective or verb sense of flat or equal (for example &ldquo;an even balance&rdquo;). <strong>Other</strong> is a holding label for anything that fits nothing else, to be reviewed at the end of each book.</p>
+<p class="gram"><em>The grammar.</em> This &ldquo;<span class="ev">even</span>&rdquo; is an adjective. It describes a noun, as in &ldquo;an <span class="ev">even</span> balance&rdquo; or &ldquo;an <span class="ev">even</span> place&rdquo;. In Luke 19:44 it comes after the verb and says what state the city will be left in: flat with the ground.</p>
+</div>
+</div>
+<h3>What &ldquo;even&rdquo; means in English</h3>
+<p>&ldquo;<span class="ev">Even</span>&rdquo; is a small English word that does several jobs. It can be an adjective, an adverb, a verb or a noun. The King James Bible uses nearly all of them.</p>
+<p>As an adjective it means level, flat, equal or balanced, as in even ground or an even chance. As a verb, &ldquo;to even&rdquo; means to make or become level or equal. We now usually say &ldquo;even out&rdquo; or &ldquo;even up.&rdquo;</p>
+<p>As an adverb it is used for emphasis and for surprise. Older English also used it for &ldquo;exactly,&rdquo; &ldquo;fully,&rdquo; or &ldquo;namely; that is to say.&rdquo; That older &ldquo;namely&rdquo; sense is common in the King James Bible, but it has largely faded in everyday English.</p>
+<p>As a noun, &ldquo;even&rdquo; is an old word for evening, as in &ldquo;at <span class="ev">even</span>.&rdquo; That noun is a different word that only looks the same. It has nothing to do with being level or with the adverb of emphasis.</p>
+<p>In the verified King James Bible text used on this page, the whole word &ldquo;even&rdquo; appears 1,394 times, in 1,346 verses. That count leaves out &ldquo;evening,&rdquo; &ldquo;eventide&rdquo; and &ldquo;eveningtide,&rdquo; and it leaves out the margin notes. Every book has at least one use, except 2 John. A reader who brings only the modern sense of surprise or extremes to the King James Bible will miss a good deal of what the word is doing.</p>
 
 <h3><span class="yhwh">LORD</span> and Lord</h3>
 <p>The verse text is the verified KJB wording. <strong class="yhwh">LORD</strong> and <strong class="yhwh">GOD</strong>, shown in small capitals, stand for God&rsquo;s name (YHWH). <strong>Lord</strong> is the title. <strong>lord</strong> is a human master. They are different words and are never treated as the same. Example: Genesis 13:10, &ldquo;even as the garden of the <span class="yhwh">LORD</span>&rdquo;; Genesis 44:18, &ldquo;Oh my lord&rdquo; (Joseph, as a man).</p>
+
+<h3>Grammar words used on this page</h3>
+<ul>
+<li><strong>Prefix:</strong> a piece fixed to the front of a word.</li>
+<li><strong>Suffix:</strong> a piece fixed to the end of a word.</li>
+<li><strong>Pronoun:</strong> a word that stands for a person, such as I, me, she.</li>
+<li><strong>Adverb:</strong> a word that adds to the meaning of a verb, an adjective or a whole statement.</li>
+<li><strong>Adjective:</strong> a word that describes a noun, such as &ldquo;<span class="ev">even</span>&rdquo; in &ldquo;an <span class="ev">even</span> balance&rdquo;.</li>
+<li><strong>Apposition:</strong> two phrases side by side that name the same thing.</li>
+<li><strong>Supplied word:</strong> a word the translators added that has no word behind it in the Hebrew or Greek.</li>
+<li><strong>Strong&rsquo;s number:</strong> the number James Strong gave each Hebrew (H) and Greek (G) word in his concordance.</li>
+</ul>
+</aside>seph, as a man).</p>
 </aside>
 
 <main id="main">

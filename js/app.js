@@ -105,6 +105,104 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
+function rangesOverlap(a, b) {
+  return a.compareBoundaryPoints(Range.END_TO_START, b) < 0 && a.compareBoundaryPoints(Range.START_TO_END, b) > 0;
+}
+
+function selectedTextInNode(range, node) {
+  const contents = document.createRange();
+  contents.selectNodeContents(node);
+  if (!rangesOverlap(range, contents)) return '';
+  const clipped = document.createRange();
+  if (range.compareBoundaryPoints(Range.START_TO_START, contents) <= 0) clipped.setStart(contents.startContainer, contents.startOffset);
+  else clipped.setStart(range.startContainer, range.startOffset);
+  if (range.compareBoundaryPoints(Range.END_TO_END, contents) >= 0) clipped.setEnd(contents.endContainer, contents.endOffset);
+  else clipped.setEnd(range.endContainer, range.endOffset);
+  return clipped.cloneContents().textContent?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+function versesFromSelection(selection) {
+  const verses = [...document.querySelectorAll('[data-scripture] .verse')];
+  const picked = [];
+  for (const verseEl of verses) {
+    const textEl = verseEl.querySelector('.verse-text');
+    if (!textEl) continue;
+    const bits = [];
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+      const bit = selectedTextInNode(selection.getRangeAt(i), textEl);
+      if (bit) bits.push(bit);
+    }
+    if (!bits.length) continue;
+    const chapterEl = verseEl.closest('[data-chapter-path]');
+    if (chapterEl) {
+      picked.push({
+        text: bits.join(' '),
+        book: chapterEl.dataset.book,
+        bookSlug: chapterEl.dataset.bookSlug,
+        chapter: Number(chapterEl.dataset.chapter),
+        verse: Number(verseEl.dataset.verse),
+        chapterPath: chapterEl.dataset.chapterPath
+      });
+    }
+  }
+  return picked;
+}
+
+const SUPER_DIGITS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+function toSuper(value) {
+  return String(value).replace(/[0-9]/g, (d) => SUPER_DIGITS[Number(d)]);
+}
+
+function escapeCopyHtml(value) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function formatCopyReference(verses) {
+  const first = verses[0];
+  const last = verses[verses.length - 1];
+  let ref;
+  if (first.chapter === last.chapter) {
+    ref = first.verse === last.verse
+      ? `${first.book} ${first.chapter}:${first.verse}`
+      : `${first.book} ${first.chapter}:${first.verse}-${last.verse}`;
+  } else {
+    ref = `${first.book} ${first.chapter}:${first.verse}-${last.chapter}:${last.verse}`;
+  }
+  return `${ref} King James Bible`;
+}
+
+function formatCopy(verses) {
+  if (!verses.length) return { plain: '', html: '' };
+  const groups = [];
+  for (const verse of verses) {
+    const group = groups[groups.length - 1];
+    if (!group || group[0].bookSlug !== verse.bookSlug) groups.push([verse]);
+    else group.push(verse);
+  }
+  const plain = groups.map((group) => `“${group.map((v) => `${toSuper(v.verse)}${v.text}`).join(' ')}”\n\n${formatCopyReference(group)}`);
+  const html = groups.map((group) => `“${group.map((v) => `<sup><b>${v.verse}</b></sup>${escapeCopyHtml(v.text)}`).join(' ')}”<br><br>${escapeCopyHtml(formatCopyReference(group))}`);
+  return { plain: plain.join('\n'), html: html.join('<br>') };
+}
+
+function bindCopy() {
+  document.addEventListener('copy', (event) => {
+    const selection = document.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+    const ancestor = selection.getRangeAt(0).commonAncestorContainer;
+    const inScripture = (ancestor.nodeType === Node.ELEMENT_NODE ? ancestor : ancestor.parentElement)?.closest('[data-scripture]')
+      || (selection.anchorNode?.nodeType === Node.TEXT_NODE
+        ? selection.anchorNode.parentElement?.closest('[data-scripture]')
+        : selection.anchorNode?.closest?.('[data-scripture]'));
+    if (!inScripture) return;
+    const payload = formatCopy(versesFromSelection(selection));
+    if (payload.plain) {
+      event.clipboardData?.setData('text/plain', payload.plain);
+      event.clipboardData?.setData('text/html', payload.html);
+      event.preventDefault();
+    }
+  });
+}
+
 function chapterHeading(book, chapter) {
   const bookHref = withBase(`/${book.slug}/`);
   const chHref = withBase(`/${book.slug}/${chapter}/`);
@@ -117,14 +215,14 @@ function verseHtml(chapter, verse) {
     ? `<p class="psalm-title">${escapeHtml(verse.title)}</p>`
     : '';
   const text = verse.title ? verse.body : verse.text;
-  return `${title}<p class="verse" id="${id}"><span class="verse-number">${verse.n}</span><span class="verse-text">${escapeHtml(text)}</span></p>`;
+  return `${title}<p class="verse" id="${id}" data-verse="${verse.n}"><span class="verse-number">${verse.n}</span><span class="verse-text">${escapeHtml(text)}</span></p>`;
 }
 
 function chapterSection(book, chapter) {
   const ch = book.chapters[chapter - 1];
   if (!ch) return '';
   const verses = ch.verses.map((v) => verseHtml(chapter, v)).join('');
-  return `<section class="chapter" data-chapter="${chapter}" id="${book.slug}-${chapter}">${chapterHeading(book, chapter)}<article>${verses}</article></section>`;
+  return `<section class="chapter" data-chapter="${chapter}" data-chapter-path="${escapeHtml(book.slug)}/${chapter}" data-book="${escapeHtml(book.name)}" data-book-slug="${escapeHtml(book.slug)}" id="${book.slug}-${chapter}">${chapterHeading(book, chapter)}<article>${verses}</article></section>`;
 }
 
 function scrollToVerse(chapter, verse) {
@@ -144,6 +242,7 @@ async function mountReader(root, slug, startChapter, startVerse) {
   const total = book.chapters.length;
   let from = startChapter;
   let to = Math.min(total, startChapter + 1);
+  root.setAttribute('data-scripture', '');
   root.innerHTML = '';
   for (let ch = from; ch <= to; ch += 1) root.insertAdjacentHTML('beforeend', chapterSection(book, ch));
   if (startVerse) {
@@ -271,6 +370,7 @@ async function start() {
   if (redirectLegacyHash()) return;
   bindStudy();
   bindSearch();
+  bindCopy();
   const root = document.querySelector('.reader[data-book]');
   if (root) {
     const slug = root.dataset.book;

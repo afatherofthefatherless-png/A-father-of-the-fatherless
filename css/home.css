@@ -165,3 +165,56 @@ body.reader-page .verse.verse-focused .verse-number{left:12px;top:calc(.35em + 1
 .reader-error{padding:24px 12px;font-size:var(--fs-body);max-width:42ch}
 .brand-name{font-weight:700}
 html,body{hyphens:none;word-break:normal;overflow-wrap:normal}
+
+
+/* Homepage search bar in the top header. Plain Armorer-style field.
+   Scoped to the main homepage header so the Study panel is unchanged. */
+body.home > .site-wrapper > .home-header{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+}
+body.home > .site-wrapper > .home-header .home-brand{min-width:0}
+body.home > .site-wrapper > .home-header .search-box{position:relative;min-width:0;width:100%}
+body.home > .site-wrapper > .home-header .search-box input{
+  width:100%;
+  height:var(--tap);
+  padding:0 16px;
+  border:var(--stroke) solid var(--line);
+  border-radius:6px;
+  background:var(--panel);
+  color:var(--text);
+  font:inherit;
+  font-size:var(--fs-ui);
+  outline:none;
+}
+body.home > .site-wrapper > .home-header .search-box input::placeholder{color:var(--muted);opacity:1}
+body.home > .site-wrapper > .home-header .search-box input::-webkit-search-cancel-button{display:none}
+
+.search-prompt{
+  margin:0 0 32px;
+  max-width:46ch;
+  font-size:24px;
+  line-height:1.6;
+  color:var(--text);
+}
+
+@media (max-width:600px){
+  .search-prompt{font-size:22px;margin-bottom:24px}
+}
+
+/* At 390px a single row left only a clipped field. Keep a stable two-row
+   header: brand + Study on the first row, full-width search on the second. */
+@media (max-width:480px){
+  body.home > .site-wrapper > .home-header{
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"brand study" "search search";
+    gap:10px 8px;
+    padding:10px 12px;
+  }
+  body.home > .site-wrapper > .home-header .home-brand{grid-area:brand;font-size:20px;white-space:nowrap;min-width:auto}
+  body.home > .site-wrapper > .home-header .search-box{grid-area:search}
+  body.home > .site-wrapper > .home-header .more-btn{grid-area:study;height:52px;padding:0 12px;gap:8px;font-size:18px}
+  body.home > .site-wrapper > .home-header .more-btn svg{width:22px;height:22px}
+}

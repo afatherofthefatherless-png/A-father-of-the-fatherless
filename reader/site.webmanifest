@@ -4,7 +4,7 @@
   "short_name": "Biblia Dyslexia",
   "description": "The King James Bible, in large, clear OpenDyslexic letters. Read at your own pace, one verse at a time. Choose a book to begin.",
   "lang": "en",
-  "start_url": "/A-father-of-the-fatherless/",
+  "start_url": "/A-father-of-the-fatherless/reader/",
   "scope": "/A-father-of-the-fatherless/reader/",
   "display": "standalone",
   "background_color": "#000000",

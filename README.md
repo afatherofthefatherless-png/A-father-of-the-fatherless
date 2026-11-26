@@ -14,7 +14,7 @@ Verse text comes from the verified KJV repository (`text` field). The wording is
 - `/old-testament/`, `/new-testament/`, `/genesis/`, `/genesis/1/` — book and chapter pages
 - `/tools/` — the older KJV reading site (Record, Stitch, Cross refs)
 - `/concordance-of-even/` — Concordance of Even
-- `/reader/` — redirects to the equivalent homepage route (old book and chapter links still work)
+- `/reader/` — Biblia Dyslexia reader (search, citations, and chapter reading)
 - `/home-test/` — earlier test build of the homepage, kept for now
 
 Nothing else should be published or deleted without Robin's explicit yes.

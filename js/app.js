@@ -297,16 +297,17 @@ function bindSearch() {
   if (!form || !input) return;
   const go = async (ev) => {
     ev?.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    input.setCustomValidity('');
     const books = await loadBooksIndex();
-    const hit = parseReference(input.value, books);
-    if (!hit) {
-      input.setCustomValidity('Type a place, for example John 3:16');
-      input.reportValidity();
+    const hit = parseReference(q, books);
+    if (hit) {
+      const hash = hit.verse ? `#${hit.verse}` : '';
+      location.href = `${BASE}/reader/${hit.slug}/${hit.chapter}/${hash}`;
       return;
     }
-    input.setCustomValidity('');
-    const hash = hit.verse ? `#${hit.verse}` : '';
-    location.href = withBase(`/${hit.slug}/${hit.chapter}/${hash}`);
+    location.href = `${BASE}/reader/?q=${encodeURIComponent(q)}`;
   };
   input.form?.addEventListener('submit', go);
   input.addEventListener('keydown', (ev) => {

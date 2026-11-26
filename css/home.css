@@ -305,3 +305,7 @@ body.home > .site-wrapper > .home-header .search-box input::-webkit-search-cance
   .home-main.search-page .search-results h2{font-size:36px}
 }
 .words-of-christ{color:#FF3333}
+
+/* chapter pages: hide the search box and book button; logo, Chapters and Home stay */
+body.reader-page .app-header .search-box{display:none}
+body.reader-page .reader{overflow-anchor:none} /* earlier chapters are added above by hand, so the browser must not shift the page too */

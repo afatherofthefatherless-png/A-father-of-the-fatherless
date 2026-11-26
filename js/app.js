@@ -271,8 +271,22 @@ async function mountReader(root, slug, startChapter, startVerse) {
       root.insertAdjacentHTML('beforeend', chapterSection(book, to));
     }
   };
-  root.addEventListener('scroll', maybeLoad, { passive: true });
+  const maybeLoadUp = () => {
+    const first = root.querySelector('.chapter');
+    if (!first) return;
+    const firstCh = Number(first.dataset.chapter);
+    if (firstCh <= 1) return;
+    if (root.scrollTop < 1200) {
+      from = firstCh - 1;
+      const before = first.getBoundingClientRect().top;
+      root.insertAdjacentHTML('afterbegin', chapterSection(book, from));
+      root.scrollTop += first.getBoundingClientRect().top - before;
+    }
+  };
+  root.addEventListener('scroll', () => { maybeLoad(); maybeLoadUp(); }, { passive: true });
   maybeLoad();
+  const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+  fontsReady.then(() => requestAnimationFrame(() => requestAnimationFrame(maybeLoadUp)));
 }
 
 function namesFor(book) {

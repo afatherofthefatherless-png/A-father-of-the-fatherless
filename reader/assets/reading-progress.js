@@ -394,9 +394,9 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
 
   function updateAccountButtons() {
     var nodes = document.querySelectorAll('.reader-account-btn');
+    var label = accountLabel();
     Array.prototype.forEach.call(nodes, function (btn) {
-      btn.textContent = accountLabel();
-      btn.setAttribute('aria-expanded', btn.getAttribute('aria-expanded') || 'false');
+      if (btn.textContent !== label) btn.textContent = label;
     });
     if (fbUser) closeSignInPanel();
   }
@@ -527,7 +527,8 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
   function ensureAccountButton(host) {
     var btn = host.querySelector('.reader-account-btn');
     if (btn) {
-      btn.textContent = accountLabel();
+      var label = accountLabel();
+      if (btn.textContent !== label) btn.textContent = label;
       return btn;
     }
     btn = document.createElement('button');

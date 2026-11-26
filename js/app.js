@@ -379,7 +379,7 @@ function scriptureHash(hash) {
 function redirectLegacyHash() {
   const hash = location.hash || '';
   if (isToolHash(hash)) {
-    location.replace(`${BASE}/tools/${hash}`);
+    location.replace(/^#\/xref(?:\?.*)?$/i.test(hash) ? `${BASE}/cross-refs/${location.search}` : `https://afatherofthefatherless-png.github.io/kjv-recorder/recorder/${location.search}`);
     return true;
   }
   const dest = scriptureHash(hash);

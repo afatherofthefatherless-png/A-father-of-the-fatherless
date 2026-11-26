@@ -1,4 +1,4 @@
-// Cross Ref Map page (Robin's "X ref Map" drawing): top bar = "X ref map info" | "Link of the Day" (the link box),
+// Cross-References Map page (Robin's "X ref Map" drawing): top bar = "X ref map info" | "Link of the Day" (the link box),
 // below it a landscape map: ruler of the 66 books on the left, one arc per cross-reference curving out to the right.
 // Arc maths ported from the "Top 100 Arcs" prototype (bible-arc-diagram.html), redrawn on <canvas> for 344,799 arcs.
 import { BOOKS } from '../kjv/books.js';
@@ -68,7 +68,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
   stick.append(base, over); content.append(stick, ruler); scroller.append(content); wrap.append(scroller);
   const listHead = h('p', { class: 'xr-list-h', id: 'xr-list-h' }), listEl = h('ol', { class: 'xr-list', id: 'xr-list', 'aria-label': 'Links in view, highest votes first' });
   const side = h('aside', { class: 'card xr-side', 'aria-labelledby': 'xr-list-h' }, listHead, listEl);
-  main.append(h('h1', { class: 'sr-only' }, 'Cross Ref Map'), h('div', { class: 'xr-top' }, info, box), h('div', { class: 'xr-body' }, wrap, side), status);
+  main.append(h('h1', { class: 'sr-only' }, 'Cross-References Map'), h('div', { class: 'xr-top' }, info, box), h('div', { class: 'xr-body' }, wrap, side), status);
 
   let L = null, Lc = null, drawn = 0, drawRaf = 0, animRaf = 0, alive = true, dpr = 1, t0 = performance.now();
   const bctx = base.getContext('2d'), octx = over.getContext('2d');

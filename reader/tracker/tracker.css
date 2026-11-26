@@ -1,0 +1,46 @@
+@font-face{
+  font-family:OpenDyslexic;
+  src:url(/A-father-of-the-fatherless/reader/assets/opendyslexic-latin-400-normal-nUhe5EwG.woff2) format("woff2");
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:OpenDyslexic;
+  src:url(/A-father-of-the-fatherless/reader/assets/opendyslexic-latin-700-normal-Bnmt45Ln.woff2) format("woff2");
+  font-weight:700;
+  font-style:normal;
+  font-display:swap;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#000}
+body{margin:0;background:#000;color:#fff;font-family:OpenDyslexic,system-ui,sans-serif;font-size:17px;line-height:1.5;overflow-x:hidden}
+.wrap{max-width:780px;margin:0 auto;padding:12px 14px 120px}
+header.top .wrap{padding-bottom:10px}
+h1{font-size:1.35em;margin:6px 0 4px;font-weight:700}
+h2{font-size:1.15em;margin:18px 0 8px;font-weight:700}
+p{margin:6px 0}
+a{color:#fff}
+.muted{color:#bbb}
+.small{font-size:.85em}
+button,select,input,textarea{font:inherit;color:#fff;background:#000;border:2px solid #fff;border-radius:10px}
+button{min-height:44px;min-width:44px;padding:6px 14px;cursor:pointer;touch-action:manipulation}
+button:active{background:#333}
+:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row > *{flex:0 0 auto}
+.grow{flex:1 1 180px !important;min-width:0}
+header.top{position:sticky;top:0;z-index:5;background:#000;padding-top:env(safe-area-inset-top);border-bottom:2px solid #fff}
+.prog{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.9em}
+.bar{height:12px;border:2px solid #fff;border-radius:8px;overflow:hidden;margin:4px 0 8px;display:flex}
+.bar > i{display:block;height:100%;width:0;flex:0 0 auto}
+.bar > i#progBar{background:#22c55e}
+.mbook{margin:0 0 10px}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:2px 0 3px}
+.mhead .nm{font-weight:700;font-size:.9em}
+.mhead .ct{font-size:.75em;color:#ccc;white-space:nowrap}
+.mbook canvas{display:block;cursor:pointer;touch-action:manipulation}
+.mapinfo{margin:4px 0 0;font-size:.85em}
+.mapinfo:empty{display:none}
+.btnlink{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;min-width:44px;padding:4px 10px;font-size:.85em;color:#fff;background:#000;border:2px solid #fff;border-radius:10px;text-decoration:none;touch-action:manipulation;white-space:normal}
+.btnlink:active{background:#333}

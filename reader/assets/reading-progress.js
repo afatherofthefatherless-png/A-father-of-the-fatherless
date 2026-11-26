@@ -469,14 +469,19 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     });
   }
 
-  function accountLabel() { return fbUser ? 'Sign out' : 'Sign in'; }
+  function accountLabel() { return fbUser ? 'Signed in' : 'Signed out'; }
+
+  function paintAccountButton(btn) {
+    var label = accountLabel();
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.classList.toggle('rp-signed-in', !!fbUser);
+    btn.classList.toggle('rp-signed-out', !fbUser);
+    btn.setAttribute('aria-label', fbUser ? 'Signed in. Tap to sign out of this device.' : 'Signed out. Tap to sign in.');
+  }
 
   function updateAccountButtons() {
     var nodes = document.querySelectorAll('.reader-account-btn');
-    var label = accountLabel();
-    Array.prototype.forEach.call(nodes, function (btn) {
-      if (btn.textContent !== label) btn.textContent = label;
-    });
+    Array.prototype.forEach.call(nodes, paintAccountButton);
     if (fbUser) closeSignInPanel();
   }
 
@@ -595,6 +600,7 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
 
   function onAccountClick() {
     if (fbUser) {
+      if (!window.confirm('Sign out of this device?')) return;
       loadFirebase().then(function () { return loadFirebase.authMod.signOut(fbAuth); })
         .catch(function (err) { lastAuthError = authMessage(err); showAuthMessage(lastAuthError); });
       return;
@@ -609,14 +615,13 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
   function ensureAccountButton(host) {
     var btn = host.querySelector('.reader-account-btn');
     if (btn) {
-      var label = accountLabel();
-      if (btn.textContent !== label) btn.textContent = label;
+      paintAccountButton(btn);
       return btn;
     }
     btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'reader-account-btn';
-    btn.textContent = accountLabel();
+    paintAccountButton(btn);
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -663,9 +668,86 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
 
     var leftover = document.getElementById('reader-mark-read');
     if (leftover) leftover.remove();
+    ensureChapterButtons();
     var loc = chapterLocation();
     if (loc) rememberLastChapter(loc);
   }
+
+  /* ---- Mark as read: one button at the end of each chapter's text ----
+     Each chapter is a <section class="chapter">; the divider is the next
+     chapter heading's top border, so the button sits above it. Space for the
+     button is reserved in CSS (padding-bottom on every .chapter) and the
+     button is absolutely placed in that space, so adding it never moves text. */
+  function sectionLocation(section) {
+    var links = section.querySelectorAll('.chapter-heading a[href]');
+    for (var i = links.length - 1; i >= 0; i--) {
+      var m = /\/([a-z0-9-]+)\/(\d+)\/?$/.exec(links[i].getAttribute('href') || '');
+      if (!m) continue;
+      var bi = SLUG_TO_BI[m[1]], c = +m[2];
+      if (bi == null || c < 1 || c > COUNTS[bi][1].length) continue;
+      return { bi: bi, c: c, slug: m[1] };
+    }
+    return null;
+  }
+
+  function paintMarkButton(btn) {
+    var bi = +btn.getAttribute('data-bi'), c = +btn.getAttribute('data-c');
+    var read = isChapterRead(bi, c);
+    var label = read ? '\u2713 Read' : 'Mark as read';
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.classList.toggle('is-read', read);
+    btn.setAttribute('aria-pressed', read ? 'true' : 'false');
+    btn.setAttribute('aria-label', displayBook(bi) + ' ' + c + (read ? ': read. Tap to mark as not read.' : ': mark as read'));
+  }
+
+  function ensureChapterButtons() {
+    var sections = document.querySelectorAll('.reader section.chapter');
+    Array.prototype.forEach.call(sections, function (section) {
+      var loc = sectionLocation(section);
+      var btn = section.querySelector(':scope > .rp-mark-read');
+      if (!loc) { if (btn) btn.remove(); return; }
+      if (btn && (+btn.getAttribute('data-bi') !== loc.bi || +btn.getAttribute('data-c') !== loc.c)) { btn.remove(); btn = null; }
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rp-mark-read';
+        btn.setAttribute('data-bi', String(loc.bi));
+        btn.setAttribute('data-c', String(loc.c));
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleChapterRead(+btn.getAttribute('data-bi'), +btn.getAttribute('data-c'));
+        });
+        section.appendChild(btn);
+      }
+      paintMarkButton(btn);
+    });
+  }
+
+  function repaintChapterButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll('.rp-mark-read'), paintMarkButton);
+  }
+  document.addEventListener('biblia-progress-changed', repaintChapterButtons);
+
+  /* ---- styles (injected before the reader renders) ---- */
+  (function injectStyles() {
+    if (document.getElementById('rp-test-style')) return;
+    var css =
+      '.reader section.chapter{padding-bottom:76px}' +
+      '.rp-mark-read{position:absolute;right:12px;bottom:12px;margin:0;box-sizing:border-box;' +
+        'min-height:48px;min-width:44px;padding:0 18px;border-radius:8px;' +
+        'font-family:OpenDyslexic,system-ui,sans-serif;font-size:.85em;font-weight:400;line-height:1.2;' +
+        'background:#000;color:#fff;border:2px solid #8a8a8a;cursor:pointer;touch-action:manipulation;' +
+        'white-space:nowrap;-webkit-tap-highlight-color:transparent}' +
+      '.rp-mark-read.is-read{background:#1f7a3a;border-color:#2fae57;color:#fff}' +
+      '.rp-mark-read:focus-visible{outline:3px solid #fff;outline-offset:2px}' +
+      'button.reader-account-btn.rp-signed-out{background:#FF3333 !important;border-color:#FF3333 !important;color:#000 !important}' +
+      'button.reader-account-btn.rp-signed-in{background:#1f7a3a !important;border-color:#2fae57 !important;color:#fff !important}';
+    var st = document.createElement('style');
+    st.id = 'rp-test-style';
+    st.textContent = css;
+    (document.head || document.documentElement).appendChild(st);
+  })();
 
   function hookHistory() {
     ['pushState', 'replaceState'].forEach(function (fn) {

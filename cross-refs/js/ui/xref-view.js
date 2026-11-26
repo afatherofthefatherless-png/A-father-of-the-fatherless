@@ -6,6 +6,7 @@ import { OSIS, GROUPS, groupOfBook, BOOK_START, bookIndexAt, THRESHOLDS, stepInf
   pickTop, arcOf, pointOn, ArcIndex, TOP_PICK, TOTAL_VERSES, visibleRange, refsInRange, arcVisible, fileInfo,
   bookConnectionCounts, bookBands, BOOK_MIN_H, chapterStart, verseY, verseAtY, ranksTouching } from '../xref/xrefs.js';
 import { loadRefs, devRefsUrl, REFS_FILE_NAME } from '../xref/refs-source.js';
+import { colorizeHtml } from '../../../js/red-letter.js';
 
 const BATCH = 6000;      // arcs drawn per animation frame (progressive; the page never blocks)
 const DOTS = 400;        // animated dots at most, taken from the top-voted arcs in view
@@ -290,7 +291,7 @@ export async function viewXref(main, { h, store, text, textStatusLine, textActio
     srcBox.setAttribute('aria-label', `Verse text: ${l.fromRef}`); tgtBox.setAttribute('aria-label', `Verse text: ${l.toRef}`);
     linkMeta.textContent = ''; srcBox.hidden = tgtBox.hidden = false;
     if (text && text.loaded) {   // verse text only from the site's checked data/kjv-crosswire.json
-      const v = id => h('p', { class: 'verse' }, text.text(id) || '');
+      const v = id => { const p = h('p', { class: 'verse' }); p.innerHTML = colorizeHtml(text.text(id) || '', id, 'cw'); return p; };
       srcBox.append(v(l.fromId)); tgtBox.append(...l.toIds.map(v));
     } else {
       const off = () => h('p', { class: 'xr-meta' }, 'Verse text not loaded.');

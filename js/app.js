@@ -1,4 +1,5 @@
 /* Biblia Dyslexia homepage test app. Path base is the GitHub Pages folder. */
+import { loadRedLetter, colorizeHtml, verseIdFromPath, verseIdFromTitle } from './red-letter.js';
 const BASE = '/A-father-of-the-fatherless';
 const VOTD_START = { y: 2026, m: 1, d: 1 }; // same date rule as the daily verse email
 const SV = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
@@ -58,7 +59,9 @@ async function fillVerseOfTheDay() {
   const entry = list[votdIndex(n, list.length)];
   if (!entry) return;
   box.href = withBase(`/${entry.slug}/${entry.chapter}/#${entry.verse_start}`);
-  box.querySelector('.votd-text').textContent = `\u201c${entry.text}\u201d`;
+  const votdText = box.querySelector('.votd-text');
+  const quoted = colorizeHtml(entry.text, entry.id);
+  votdText.innerHTML = `\u201c${quoted}\u201d`;
   box.querySelector('.votd-ref').textContent = entry.reference;
 }
 
@@ -209,19 +212,25 @@ function chapterHeading(book, chapter) {
   return `<h2 class="chapter-heading"><a href="${bookHref}">${escapeHtml(book.name)}</a><span aria-hidden="true"> ⟫ </span><a href="${chHref}">Chapter ${chapter}</a></h2>`;
 }
 
-function verseHtml(chapter, verse) {
+function verseId(book, chapter, verse) {
+  const code = book.code || book.book || '';
+  return code ? `${code}.${chapter}.${verse}` : '';
+}
+
+function verseHtml(book, chapter, verse) {
   const id = `v${chapter}-${verse.n}`;
   const title = verse.title
     ? `<p class="psalm-title">${escapeHtml(verse.title)}</p>`
     : '';
   const text = verse.title ? verse.body : verse.text;
-  return `${title}<p class="verse" id="${id}" data-verse="${verse.n}"><span class="verse-number">${verse.n}</span><span class="verse-text">${escapeHtml(text)}</span></p>`;
+  const html = verse.title ? escapeHtml(text) : colorizeHtml(text, verseId(book, chapter, verse.n));
+  return `${title}<p class="verse" id="${id}" data-verse="${verse.n}"><span class="verse-number">${verse.n}</span><span class="verse-text">${html}</span></p>`;
 }
 
 function chapterSection(book, chapter) {
   const ch = book.chapters[chapter - 1];
   if (!ch) return '';
-  const verses = ch.verses.map((v) => verseHtml(chapter, v)).join('');
+  const verses = ch.verses.map((v) => verseHtml(book, chapter, v)).join('');
   return `<section class="chapter" data-chapter="${chapter}" data-chapter-path="${escapeHtml(book.slug)}/${chapter}" data-book="${escapeHtml(book.name)}" data-book-slug="${escapeHtml(book.slug)}" id="${book.slug}-${chapter}">${chapterHeading(book, chapter)}<article>${verses}</article></section>`;
 }
 
@@ -456,8 +465,19 @@ function renderResults(main, query, state) {
     const items = (state.results || []).map((hit) => {
       const href = escapeHtml(resultHref(hit.path));
       const title = escapeHtml(hit.title || '');
-      const raw = hit.html || hit.content || '';
-      const html = /<[a-z]|<\//i.test(raw) ? raw : escapeHtml(raw);
+      const raw = hit.content || ( /<[a-z]|<\//i.test(hit.html || '') ? '' : (hit.html || '') );
+      const fromPath = verseIdFromPath(hit.path || '');
+      const fromTitle = verseIdFromTitle(hit.title || '');
+      let id = '';
+      if (fromPath) {
+        const book = (booksIndex || []).find((b) => b.slug === fromPath.slug);
+        if (book) id = `${book.code}.${fromPath.chapter}.${fromPath.verse}`;
+      } else if (fromTitle) {
+        const name = fromTitle.name.toLowerCase();
+        const book = (booksIndex || []).find((b) => b.name.toLowerCase() === name || b.slug === name.replace(/\s+/g, '-'));
+        if (book) id = `${book.code}.${fromTitle.chapter}.${fromTitle.verse}`;
+      }
+      const html = raw ? colorizeHtml(raw, id) : ( /<[a-z]|<\//i.test(hit.html || '') ? hit.html : escapeHtml(hit.html || '') );
       return `<li><a href="${href}">${title}</a><p>${html}</p></li>`;
     }).join('');
     body += `<p class="search-summary" aria-live="polite">${escapeHtml(searchSummary(query, state.occurrenceCount, state.resultCount, state.bookCount))}</p>`;
@@ -506,6 +526,7 @@ async function showSearchResults(query) {
 
 async function start() {
   if (redirectLegacyHash()) return;
+  await loadRedLetter();
   bindStudy();
   bindSearch();
   bindCopy();

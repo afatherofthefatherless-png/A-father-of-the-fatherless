@@ -3,6 +3,7 @@ import { Store, requestPersistentStorage } from './store/db.js';
 import { MemoryStore } from './store/memory.js';
 import { loadTextSource, TextSource, MESSAGES, MISSING_MESSAGE } from './kjv/text-source.js';
 import { viewXref } from './ui/xref-view.js';
+import { loadRedLetter } from '../../js/red-letter.js';
 
 const h = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -38,6 +39,7 @@ async function init() {
   requestPersistentStorage();
   for (const k of ['textSource', 'textCache.v1', 'refsCache.v1']) store.setKv(k, null).catch(() => {});
   reloadText();
+  await loadRedLetter();
   const main = document.getElementById('main');
   await viewXref(main, { h, store, text, textStatusLine, textActions });
 }

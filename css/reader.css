@@ -65,3 +65,4 @@ hr{margin:36px 48px;border:0;border-top:var(--stroke) solid var(--line)}
 .result-list li:first-child{border-radius:6px 6px 0 0}.result-list li:last-child{border-radius:0 0 6px 6px}
 .result-list a{font-weight:700}
 .result-list p{margin:6px 0 4px;font-size:22px;line-height:1.6;max-width:56ch}
+.words-of-christ{color:#FF3333}

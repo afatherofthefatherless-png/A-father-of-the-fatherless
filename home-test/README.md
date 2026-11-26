@@ -1,6 +1,6 @@
 # Biblia Dyslexia homepage (test)
 
-Test-only build of the Biblia Dyslexia homepage. The live site root and `/reader/` are unchanged. Nothing here goes live without Robin's explicit yes.
+Test-only build of the Biblia Dyslexia homepage. This folder is unchanged. Nothing here goes live without Robin's explicit yes.
 
 Served at `/A-father-of-the-fatherless/home-test/` on GitHub Pages.
 Verse text is taken from the verified KJV repository `text` field at build time.

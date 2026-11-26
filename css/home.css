@@ -218,3 +218,89 @@ body.home > .site-wrapper > .home-header .search-box input::-webkit-search-cance
   body.home > .site-wrapper > .home-header .more-btn{grid-area:study;height:52px;padding:0 12px;gap:8px;font-size:18px}
   body.home > .site-wrapper > .home-header .more-btn svg{width:22px;height:22px}
 }
+
+/* Search results on the homepage */
+.home-main.search-page{padding-bottom:40px}
+.home-main.search-page .search-summary{
+  margin:0 0 20px;
+  max-width:46ch;
+  font-size:var(--fs-body);
+  line-height:1.6;
+}
+.home-main.search-page .search-status{
+  margin:0 0 20px;
+  max-width:46ch;
+  font-size:var(--fs-body);
+  line-height:1.6;
+  color:var(--muted);
+}
+.home-main.search-page .search-results h2{
+  margin:0 0 16px;
+  font-size:var(--fs-welcome);
+  font-weight:700;
+  line-height:1.25;
+}
+.home-main.search-page .result-list{
+  margin:0;
+  padding:0;
+  list-style:none;
+  display:grid;
+  gap:20px;
+}
+.home-main.search-page .result-list a{
+  display:block;
+  font-size:var(--fs-tab);
+  font-weight:700;
+  line-height:1.3;
+  text-decoration:underline;
+  text-underline-offset:4px;
+  text-decoration-thickness:2px;
+}
+.home-main.search-page .result-list p{
+  margin:8px 0 0;
+  max-width:46ch;
+  font-size:var(--fs-body);
+  line-height:1.6;
+}
+.home-main.search-page .result-list mark{
+  background:transparent;
+  color:inherit;
+  font-weight:700;
+}
+.home-main.search-page .pagination{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:20px 0;
+}
+.home-main.search-page .pagination a,
+.home-main.search-page .pagination button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:52px;
+  min-height:52px;
+  padding:0 14px;
+  border:var(--stroke) solid var(--text);
+  border-radius:12px;
+  background:var(--bg);
+  color:var(--text);
+  font:inherit;
+  font-size:22px;
+  font-weight:700;
+  text-decoration:none;
+  cursor:pointer;
+}
+.home-main.search-page .pagination button:disabled{
+  opacity:.4;
+  cursor:default;
+}
+.home-main.search-page .pagination a[aria-current="page"]{
+  background:var(--panel);
+}
+@media (max-width:600px){
+  .home-main.search-page .search-summary,
+  .home-main.search-page .search-status,
+  .home-main.search-page .result-list p{font-size:24px}
+  .home-main.search-page .search-results h2{font-size:36px}
+}

@@ -304,10 +304,10 @@ function bindSearch() {
     const hit = parseReference(q, books);
     if (hit) {
       const hash = hit.verse ? `#${hit.verse}` : '';
-      location.href = `${BASE}/reader/${hit.slug}/${hit.chapter}/${hash}`;
+      location.href = withBase(`/${hit.slug}/${hit.chapter}/${hash}`);
       return;
     }
-    location.href = `${BASE}/reader/?q=${encodeURIComponent(q)}`;
+    location.href = `${BASE}/?q=${encodeURIComponent(q)}`;
   };
   input.form?.addEventListener('submit', go);
   input.addEventListener('keydown', (ev) => {
@@ -367,6 +367,143 @@ function redirectLegacyHash() {
   return false;
 }
 
+const SEARCH_INDEX_URL = withBase('/data/search/index.e2de83c698e9ad70.json');
+const SEARCH_HASH = 'e2de83c698e9ad70d92580c25ed7e1fe2767bb04feb270f61b14a54eac8e4884';
+const SEARCH_WORKER_URL = withBase('/js/search-worker-HDupR5PD.js');
+const SEARCH_PAGE_SIZE = 20;
+
+let searchWorker;
+
+function getSearchWorker() {
+  if (!searchWorker) searchWorker = new Worker(SEARCH_WORKER_URL, { type: 'module' });
+  return searchWorker;
+}
+
+function runSearch(query, start, count) {
+  const worker = getSearchWorker();
+  const key = Date.now() + Math.random();
+  return new Promise((resolve, reject) => {
+    const onMessage = (ev) => {
+      if (ev.data?.key !== key) return;
+      worker.removeEventListener('message', onMessage);
+      if (ev.data.error) reject(new Error(ev.data.error));
+      else resolve(ev.data);
+    };
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({
+      query, start, count, key, searchHash: SEARCH_HASH, indexUrl: SEARCH_INDEX_URL
+    });
+  });
+}
+
+function searchQuery() {
+  return new URLSearchParams(location.search).get('q') || '';
+}
+
+function searchPage() {
+  const n = Number(new URLSearchParams(location.search).get('p'));
+  return Number.isInteger(n) && n > 0 ? n : 1;
+}
+
+function searchSummary(query, occurrences, verses, books) {
+  const term = query.trim();
+  if (!term) return '';
+  const times = occurrences === 1 ? '1 time' : `${occurrences} times`;
+  const verseLabel = verses === 1 ? '1 verse' : `${verses} verses`;
+  const bookLabel = books === 1 ? '1 book' : `${books} books`;
+  return `\u2018${term}\u2019 occurs ${times} in ${verseLabel} in ${bookLabel}`;
+}
+
+function resultHref(path) {
+  return withBase(path);
+}
+
+function pageHref(query, page) {
+  const q = `${BASE}/?q=${encodeURIComponent(query)}`;
+  return page > 1 ? `${q}&p=${page}` : q;
+}
+
+function paginationHtml(query, page, totalPages) {
+  if (totalPages <= 1) return '';
+  const from = Math.max(1, page - 2);
+  const to = Math.min(totalPages, page + 2);
+  let buttons = '';
+  const btn = (n, label, disabled, current) => {
+    if (disabled) return `<button type="button" disabled aria-label="${label}">${label}</button>`;
+    const currentAttr = current ? ' aria-current="page"' : '';
+    return `<a href="${pageHref(query, n)}"${currentAttr}>${label}</a>`;
+  };
+  buttons += btn(page - 1, '\u00ab', page <= 1, false);
+  for (let n = from; n <= to; n += 1) buttons += btn(n, String(n), false, n === page);
+  buttons += btn(page + 1, '\u00bb', page >= totalPages, false);
+  return `<nav class="pagination" aria-label="Search results page">${buttons}</nav>`;
+}
+
+function renderResults(main, query, state) {
+  const footer = '<footer class="home-foot"><span>A Father of the Fatherless Ministry</span></footer>';
+  let body = '<h1 class="visually-hidden">Search</h1>';
+  if (state.loading) {
+    body += '<p class="search-status" role="status">Searching\u2026</p>';
+  } else if (state.error) {
+    body += `<p class="search-status">${escapeHtml(state.error)}</p>`;
+  } else if (query.trim().length < 3) {
+    body += '<p class="search-status">Type at least three letters to search.</p>';
+  } else if (!state.resultCount) {
+    body += `<p class="search-summary">${escapeHtml(searchSummary(query, 0, 0, 0))}</p>`;
+    body += '<p class="search-status">No results found</p>';
+  } else {
+    const totalPages = Math.ceil(state.resultCount / SEARCH_PAGE_SIZE);
+    const items = (state.results || []).map((hit) => {
+      const href = escapeHtml(resultHref(hit.path));
+      const title = escapeHtml(hit.title || '');
+      const raw = hit.html || hit.content || '';
+      const html = /<[a-z]|<\//i.test(raw) ? raw : escapeHtml(raw);
+      return `<li><a href="${href}">${title}</a><p>${html}</p></li>`;
+    }).join('');
+    body += `<p class="search-summary" aria-live="polite">${escapeHtml(searchSummary(query, state.occurrenceCount, state.resultCount, state.bookCount))}</p>`;
+    body += `<section class="search-results" aria-label="Search Results"><h2>Search Results</h2>`;
+    body += paginationHtml(query, state.page, totalPages);
+    body += `<ul class="result-list">${items}</ul>`;
+    body += paginationHtml(query, state.page, totalPages);
+    body += '</section>';
+  }
+  main.classList.add('search-page');
+  main.innerHTML = body + footer;
+}
+
+async function showSearchResults(query) {
+  const main = document.querySelector('main.home-main');
+  if (!main) return;
+  const input = document.querySelector('.home-header input[type="search"]');
+  if (input && !input.value) input.value = query;
+  const books = await loadBooksIndex();
+  const hit = parseReference(query, books);
+  if (hit) {
+    const hash = hit.verse ? `#${hit.verse}` : '';
+    location.replace(withBase(`/${hit.slug}/${hit.chapter}/${hash}`));
+    return;
+  }
+  const page = searchPage();
+  renderResults(main, query, { loading: true, page });
+  if (query.trim().length < 3) {
+    renderResults(main, query, { loading: false, page, resultCount: 0, results: [] });
+    return;
+  }
+  try {
+    const data = await runSearch(query, (page - 1) * SEARCH_PAGE_SIZE, SEARCH_PAGE_SIZE);
+    renderResults(main, query, {
+      loading: false,
+      page,
+      results: data.results || [],
+      resultCount: data.resultCount || 0,
+      occurrenceCount: data.occurrenceCount || 0,
+      bookCount: data.bookCount || 0
+    });
+  } catch (err) {
+    renderResults(main, query, { loading: false, page, error: err.message || 'Search could not be completed.' });
+  }
+}
+
 async function start() {
   if (redirectLegacyHash()) return;
   bindStudy();
@@ -381,6 +518,16 @@ async function start() {
       await mountReader(root, slug, chapter, verse);
     } catch (err) {
       root.innerHTML = `<p class="reader-error">${escapeHtml(err.message || 'Could not open this chapter.')}</p>`;
+    }
+    return;
+  }
+  const query = searchQuery();
+  const { parts } = parsePath();
+  if (query && parts.length === 0) {
+    try {
+      await showSearchResults(query);
+    } catch (err) {
+      console.warn(err);
     }
     return;
   }

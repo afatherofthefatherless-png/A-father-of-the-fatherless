@@ -61,12 +61,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    await self.clients.claim();
-    /* Force-refresh: reload open reader tabs once so an old saved copy is replaced straight away. */
-    const wins = await self.clients.matchAll({ type: 'window' });
-    await Promise.all(wins.map((c) => c.navigate(c.url).catch(() => {})));
-  })());
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('message', (event) => {

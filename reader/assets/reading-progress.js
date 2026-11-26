@@ -16,6 +16,7 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
   var TRACKER_URL = READER_BASE + 'tracker/';
   var STORAGE_KEY = 'biblia-dyslexia-reading-progress.v1';
   var SESSION_SKIP = 'biblia-dyslexia-reading-progress-skip';
+  var LAST_CHAPTER_KEY = 'biblia-dyslexia-last-chapter.v1';
 
   /* ---- verse index (same as the original tracker) ---- */
   var N = 0, OFF = [], BSTART = [], BTOT = [], BOOK_SLUG = [], SLUG_TO_BI = Object.create(null);
@@ -66,6 +67,37 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     for (var g = 0; g < N; g++) if (COV[g]) covered++;
   }
 
+  function normalizeChapterKey(k) {
+    if (typeof k !== 'string') return null;
+    var p = k.split(':');
+    if (p.length < 2) return null;
+    var c = +p[p.length - 1];
+    if (!c) return null;
+    var left = p.slice(0, -1).join(':');
+    if (Object.prototype.hasOwnProperty.call(SLUG_TO_BI, left)) {
+      if (c < 1 || c > COUNTS[SLUG_TO_BI[left]][1].length) return null;
+      return chapterKey(SLUG_TO_BI[left], c);
+    }
+    if (/^\d+$/.test(left)) {
+      var bi = +left;
+      if (bi >= 0 && bi < COUNTS.length && c >= 1 && c <= COUNTS[bi][1].length) return chapterKey(bi, c);
+    }
+    var slug = slugOf(left);
+    if (Object.prototype.hasOwnProperty.call(SLUG_TO_BI, slug)) {
+      if (c < 1 || c > COUNTS[SLUG_TO_BI[slug]][1].length) return null;
+      return chapterKey(SLUG_TO_BI[slug], c);
+    }
+    return null;
+  }
+
+  function applyChapterList(list) {
+    (list || []).forEach(function (k) {
+      var nk = normalizeChapterKey(k);
+      if (nk) chapters[nk] = 1;
+    });
+    rebuildCoverage();
+  }
+
   function loadProgress() {
     var raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { storageOK = false; }
@@ -73,12 +105,22 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     if (raw) {
       try {
         var data = JSON.parse(raw);
-        if (data && data.app === 'biblia-dyslexia-reading-progress' && Array.isArray(data.chapters)) {
-          data.chapters.forEach(function (k) { if (typeof k === 'string') chapters[k] = 1; });
-        }
+        if (data && Array.isArray(data.chapters)) applyChapterList(data.chapters);
       } catch (e) { /* unreadable: start fresh, do not touch other keys */ }
     }
     rebuildCoverage();
+    /* If older key shapes were found, rewrite in the live slug format without dropping marks. */
+    try {
+      if (raw) {
+        var prev = JSON.parse(raw);
+        if (prev && Array.isArray(prev.chapters)) {
+          var canonical = progressPayload();
+          var before = prev.chapters.slice().sort().join('\0');
+          var after = canonical.chapters.slice().sort().join('\0');
+          if (before !== after) localStorage.setItem(STORAGE_KEY, JSON.stringify(canonical));
+        }
+      }
+    } catch (e) {}
   }
 
   function progressPayload() {
@@ -105,6 +147,48 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     chapters[chapterKey(bi, c)] = 1;
     rebuildCoverage();
     saveProgress();
+    notifyChange();
+  }
+
+  function toggleChapterRead(bi, c) {
+    var k = chapterKey(bi, c);
+    if (chapters[k]) delete chapters[k];
+    else chapters[k] = 1;
+    rebuildCoverage();
+    saveProgress();
+    notifyChange();
+  }
+
+  function rememberLastChapter(loc) {
+    if (!loc) return;
+    try {
+      localStorage.setItem(LAST_CHAPTER_KEY, JSON.stringify({
+        slug: loc.slug,
+        c: loc.c,
+        path: READER_BASE + loc.slug + '/' + loc.c + '/'
+      }));
+    } catch (e) {}
+  }
+
+  function lastChapterUrl() {
+    try {
+      var data = JSON.parse(localStorage.getItem(LAST_CHAPTER_KEY) || 'null');
+      if (data && data.slug && data.c && SLUG_TO_BI[data.slug] != null) {
+        var nch = COUNTS[SLUG_TO_BI[data.slug]][1].length;
+        if (data.c >= 1 && data.c <= nch) return READER_BASE + data.slug + '/' + data.c + '/';
+      }
+    } catch (e) {}
+    return READER_BASE;
+  }
+
+  function notifyChange() {
+    try { document.dispatchEvent(new CustomEvent('biblia-progress-changed')); } catch (e) {}
+  }
+
+  function bookChapterStats(bi) {
+    var nCh = COUNTS[bi][1].length, rCh = 0, i;
+    for (i = 1; i <= nCh; i++) if (isChapterRead(bi, i)) rCh++;
+    return { name: COUNTS[bi][0], nCh: nCh, rCh: rCh };
   }
 
   function bookCovered(bi) {
@@ -260,11 +344,6 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
   var EMAIL_LINK_KEY = 'biblia-dyslexia-email-for-link';
   var fbApp = null, fbAuth = null, fbDb = null, fbUser = null, fbReady = null, cloudTimer = null, lastAuthError = '';
 
-  function preferRedirect() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-
   function authMessage(err) {
     var code = (err && (err.code || err.message)) || '';
     var text = (err && err.message) || String(err || '');
@@ -282,7 +361,8 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     if (/auth\/email-already-in-use/i.test(code)) return 'That email already has an account. Try Sign in, or use a sign-in link.';
     if (/auth\/weak-password/i.test(code)) return 'Please choose a longer password.';
     if (/auth\/missing-password/i.test(code)) return 'Please type a password, or send a sign-in link instead.';
-    if (/auth\/popup-blocked|auth\/popup-closed-by-user/i.test(code)) return 'The Google window was blocked or closed. Please try again.';
+    if (/auth\/popup-blocked/i.test(code)) return 'The Google window was blocked. Trying another way…';
+    if (/auth\/popup-closed-by-user/i.test(code)) return 'The Google window was closed. Please try again.';
     return 'Could not sign in. Progress is still saved on this device.';
   }
 
@@ -299,7 +379,11 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
       fbDb = dbMod.getDatabase(fbApp, FB_CONFIG.databaseURL);
       loadFirebase.authMod = authMod;
       loadFirebase.dbMod = dbMod;
-      return finishEmailLink().then(function () {
+      return authMod.setPersistence(fbAuth, authMod.browserLocalPersistence).catch(function () {
+        /* already set, or persistence is unavailable */
+      }).then(function () {
+        return finishEmailLink();
+      }).then(function () {
         return authMod.getRedirectResult(fbAuth).catch(function (err) {
           lastAuthError = authMessage(err);
           showAuthMessage(lastAuthError);
@@ -348,11 +432,6 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     return dbMod.set(dbMod.ref(fbDb, cloudPath()), payload);
   }
 
-  function applyChapterList(list) {
-    (list || []).forEach(function (k) { if (typeof k === 'string') chapters[k] = 1; });
-    rebuildCoverage();
-  }
-
   function mergeCloudAndLocal(cloud) {
     applyChapterList(cloud && Array.isArray(cloud.chapters) ? cloud.chapters : []);
     var payload = progressPayload();
@@ -382,8 +461,8 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     cloudGet().then(function (cloud) {
       return mergeCloudAndLocal(cloud);
     }).then(function () {
-      if (isTrackerPage()) { renderHeader(); renderMap(); }
-      else scheduleHook();
+      notifyChange();
+      if (!isTrackerPage()) scheduleHook();
     }).catch(function (err) {
       lastAuthError = authMessage(err);
       showAuthMessage(lastAuthError);
@@ -456,19 +535,22 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     };
   }
 
+  /* Must not await or load modules here: iPad Safari drops the user gesture. */
   function doGoogle() {
     showAuthMessage('Opening Google…');
-    loadFirebase().then(function () {
-      if (!fbAuth) throw new Error('CONFIGURATION_NOT_FOUND');
-      var authMod = loadFirebase.authMod;
-      var provider = new authMod.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      if (preferRedirect()) return authMod.signInWithRedirect(fbAuth, provider);
-      return authMod.signInWithPopup(fbAuth, provider).catch(function (err) {
-        if (/popup/i.test(err && err.code || '')) return authMod.signInWithRedirect(fbAuth, provider);
-        throw err;
-      });
-    }).catch(function (err) {
+    var authMod = loadFirebase.authMod;
+    if (!fbAuth || !authMod) {
+      showAuthMessage('Still getting sign-in ready. Please try again in a moment.');
+      loadFirebase();
+      return;
+    }
+    var provider = new authMod.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    authMod.signInWithPopup(fbAuth, provider).catch(function (err) {
+      if (err && err.code === 'auth/popup-blocked') {
+        showAuthMessage(authMessage(err));
+        return authMod.signInWithRedirect(fbAuth, provider);
+      }
       lastAuthError = authMessage(err);
       showAuthMessage(lastAuthError);
     });
@@ -544,7 +626,7 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     return btn;
   }
 
-  /* ---- reader hook: Tracker tab + Mark as read? Yes / No ---- */
+  /* ---- reader hook: Tracker tab + Sign in. Mark as read? is deferred. ---- */
   var hookScheduled = false;
   function scheduleHook() {
     if (hookScheduled) return;
@@ -579,49 +661,10 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
       tools.appendChild(tab);
     }
 
+    var leftover = document.getElementById('reader-mark-read');
+    if (leftover) leftover.remove();
     var loc = chapterLocation();
-    var bar = document.getElementById('reader-mark-read');
-    if (!loc) {
-      if (bar) bar.remove();
-      return;
-    }
-
-    if (isChapterRead(loc.bi, loc.c)) {
-      if (bar) bar.remove();
-      return;
-    }
-    var skipped = readSkipSet();
-    if (skipped[skipKey(loc)]) {
-      if (bar) bar.remove();
-      return;
-    }
-
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'reader-mark-read';
-      bar.className = 'reader-mark-read';
-      bar.setAttribute('role', 'group');
-      bar.setAttribute('aria-label', 'Mark this chapter as read');
-      bar.innerHTML = '<span class="reader-mark-read-q">Mark as read?</span>' +
-        '<button type="button" class="reader-mark-read-yes">Yes</button>' +
-        '<button type="button" class="reader-mark-read-no">No</button>';
-      document.body.appendChild(bar);
-      bar.querySelector('.reader-mark-read-yes').addEventListener('click', function () {
-        var here = chapterLocation();
-        if (!here) return;
-        markChapterRead(here.bi, here.c);
-        bar.remove();
-      });
-      bar.querySelector('.reader-mark-read-no').addEventListener('click', function () {
-        var here = chapterLocation();
-        if (here) {
-          var s = readSkipSet();
-          s[skipKey(here)] = 1;
-          writeSkipSet(s);
-        }
-        bar.remove();
-      });
-    }
+    if (loc) rememberLastChapter(loc);
   }
 
   function hookHistory() {
@@ -645,25 +688,54 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
   window.addEventListener('storage', function (e) {
     if (e.key === STORAGE_KEY) {
       loadProgress();
-      if (isTrackerPage()) { renderHeader(); renderMap(); }
-      else scheduleHook();
+      notifyChange();
+      if (!isTrackerPage()) scheduleHook();
     }
   });
 
   function startAuth() { loadFirebase(); }
 
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.reader-account-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    onAccountClick();
+  }, true);
+
+  window.BibliaReading = {
+    COUNTS: COUNTS,
+    NT_START: 39,
+    STORAGE_KEY: STORAGE_KEY,
+    READER_BASE: READER_BASE,
+    TRACKER_URL: TRACKER_URL,
+    isChapterRead: isChapterRead,
+    toggleChapterRead: toggleChapterRead,
+    bookChapterStats: bookChapterStats,
+    chapterKey: chapterKey,
+    lastChapterUrl: lastChapterUrl,
+    loadProgress: loadProgress,
+    fmtNum: fmtNum,
+    esc: esc,
+    authIsReady: function () { return !!(fbAuth && loadFirebase.authMod); },
+    authReady: function () { return loadFirebase(); },
+    firebaseAppName: function () { return fbApp ? fbApp.name : null; },
+    firebasePersistence: 'browserLocalPersistence',
+    updateAccountButtons: updateAccountButtons,
+    ensureAccountButton: ensureAccountButton
+  };
+
+  startAuth();
   if (isTrackerPage()) {
     function bootTracker() {
       var row = document.querySelector('header.top .row');
       if (row) ensureAccountButton(row);
-      initMap();
-      startAuth();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootTracker);
     else bootTracker();
   } else if (readerParts().length || location.pathname.indexOf('/reader') !== -1) {
     hookHistory();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { scheduleHook(); startAuth(); });
-    else { scheduleHook(); startAuth(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleHook);
+    else scheduleHook();
   }
 })();

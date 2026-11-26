@@ -81,17 +81,22 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     rebuildCoverage();
   }
 
-  function saveProgress() {
-    var payload = JSON.stringify({
+  function progressPayload() {
+    return {
       app: 'biblia-dyslexia-reading-progress',
       version: 1,
       translation: 'KJV',
       totalVerses: N,
       saved: new Date().toISOString(),
       chapters: Object.keys(chapters).sort()
-    });
-    try { localStorage.setItem(STORAGE_KEY, payload); storageOK = true; }
+    };
+  }
+
+  function saveProgress() {
+    var payload = progressPayload();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); storageOK = true; }
     catch (e) { storageOK = false; }
+    scheduleCloudSave(payload);
   }
 
   function isChapterRead(bi, c) { return !!chapters[chapterKey(bi, c)]; }
@@ -235,6 +240,309 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     try { sessionStorage.setItem(SESSION_SKIP, JSON.stringify(s)); } catch (e) {}
   }
 
+
+  /* ---- Firebase Auth + Realtime Database (project bible-reading-tracker-18cf8) ----
+     The original Bible Reading Tracker uses this same project only for save-code
+     snapshots at /t/<code>.json, with no login. This reading tracker does not
+     touch that path. Progress for a signed-in person is stored at
+     users/<uid>/reading-progress. Signed-out progress stays in localStorage.
+     Console settings and database rules are not changed by this page. */
+  var FB_CONFIG = {
+    apiKey: 'AIzaSyCvK1qqhrdqvKiaJIZrPORbeOcQKPpNyoI',
+    authDomain: 'bible-reading-tracker-18cf8.firebaseapp.com',
+    databaseURL: 'https://bible-reading-tracker-18cf8-default-rtdb.europe-west1.firebasedatabase.app',
+    projectId: 'bible-reading-tracker-18cf8',
+    storageBucket: 'bible-reading-tracker-18cf8.firebasestorage.app',
+    messagingSenderId: '577346979030',
+    appId: '1:577346979030:web:014b5407d905fedd9cb577'
+  };
+  var FB_SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
+  var EMAIL_LINK_KEY = 'biblia-dyslexia-email-for-link';
+  var fbApp = null, fbAuth = null, fbDb = null, fbUser = null, fbReady = null, cloudTimer = null, lastAuthError = '';
+
+  function preferRedirect() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function authMessage(err) {
+    var code = (err && (err.code || err.message)) || '';
+    var text = (err && err.message) || String(err || '');
+    if (/CONFIGURATION_NOT_FOUND|auth\/configuration-not-found|auth\/operation-not-allowed|admin-restricted-operation/i.test(code + ' ' + text)) {
+      return 'Sign in is not switched on yet for this site. Progress is still saved on this device.';
+    }
+    if (/auth\/unauthorized-domain|unauthorized-domain/i.test(code + ' ' + text)) {
+      return 'This site address is not yet allowed for sign-in. Progress is still saved on this device.';
+    }
+    if (/PERMISSION_DENIED|permission-denied/i.test(code + ' ' + text)) {
+      return 'Signed in, but the shared copy could not be saved yet. Progress is still saved on this device.';
+    }
+    if (/auth\/invalid-email/i.test(code)) return 'Please type a valid email address.';
+    if (/auth\/invalid-credential|auth\/wrong-password|auth\/user-not-found/i.test(code)) return 'That email and password did not match.';
+    if (/auth\/email-already-in-use/i.test(code)) return 'That email already has an account. Try Sign in, or use a sign-in link.';
+    if (/auth\/weak-password/i.test(code)) return 'Please choose a longer password.';
+    if (/auth\/missing-password/i.test(code)) return 'Please type a password, or send a sign-in link instead.';
+    if (/auth\/popup-blocked|auth\/popup-closed-by-user/i.test(code)) return 'The Google window was blocked or closed. Please try again.';
+    return 'Could not sign in. Progress is still saved on this device.';
+  }
+
+  function loadFirebase() {
+    if (fbReady) return fbReady;
+    fbReady = Promise.all([
+      import(FB_SDK + 'firebase-app.js'),
+      import(FB_SDK + 'firebase-auth.js'),
+      import(FB_SDK + 'firebase-database.js')
+    ]).then(function (mods) {
+      var appMod = mods[0], authMod = mods[1], dbMod = mods[2];
+      fbApp = appMod.getApps && appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(FB_CONFIG);
+      fbAuth = authMod.getAuth(fbApp);
+      fbDb = dbMod.getDatabase(fbApp, FB_CONFIG.databaseURL);
+      loadFirebase.authMod = authMod;
+      loadFirebase.dbMod = dbMod;
+      return finishEmailLink().then(function () {
+        return authMod.getRedirectResult(fbAuth).catch(function (err) {
+          lastAuthError = authMessage(err);
+          showAuthMessage(lastAuthError);
+        });
+      }).then(function () {
+        authMod.onAuthStateChanged(fbAuth, onAuthChanged);
+      });
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+    return fbReady;
+  }
+
+  function finishEmailLink() {
+    var authMod = loadFirebase.authMod;
+    if (!authMod || !authMod.isSignInWithEmailLink(fbAuth, location.href)) return Promise.resolve();
+    var email = '';
+    try { email = localStorage.getItem(EMAIL_LINK_KEY) || ''; } catch (e) {}
+    if (!email) email = window.prompt('Please type the email that received the sign-in link.') || '';
+    if (!email) return Promise.resolve();
+    return authMod.signInWithEmailLink(fbAuth, email, location.href).then(function () {
+      try { localStorage.removeItem(EMAIL_LINK_KEY); } catch (e) {}
+      try { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]apiKey=[^&]*/g, '').replace(/^&/, '?') + location.hash); } catch (e) {}
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function cloudPath() {
+    return fbUser ? 'users/' + fbUser.uid + '/reading-progress' : null;
+  }
+
+  function cloudGet() {
+    if (!fbUser || !fbDb) return Promise.resolve(null);
+    var dbMod = loadFirebase.dbMod;
+    return dbMod.get(dbMod.ref(fbDb, cloudPath())).then(function (snap) {
+      return snap.exists() ? snap.val() : null;
+    });
+  }
+
+  function cloudPut(payload) {
+    if (!fbUser || !fbDb) return Promise.resolve();
+    var dbMod = loadFirebase.dbMod;
+    return dbMod.set(dbMod.ref(fbDb, cloudPath()), payload);
+  }
+
+  function applyChapterList(list) {
+    (list || []).forEach(function (k) { if (typeof k === 'string') chapters[k] = 1; });
+    rebuildCoverage();
+  }
+
+  function mergeCloudAndLocal(cloud) {
+    applyChapterList(cloud && Array.isArray(cloud.chapters) ? cloud.chapters : []);
+    var payload = progressPayload();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); storageOK = true; }
+    catch (e) { storageOK = false; }
+    return cloudPut(payload).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function scheduleCloudSave(payload) {
+    if (!fbUser) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(function () {
+      cloudPut(payload || progressPayload()).catch(function (err) {
+        lastAuthError = authMessage(err);
+        showAuthMessage(lastAuthError);
+      });
+    }, 400);
+  }
+
+  function onAuthChanged(user) {
+    fbUser = user || null;
+    updateAccountButtons();
+    if (!fbUser) return;
+    cloudGet().then(function (cloud) {
+      return mergeCloudAndLocal(cloud);
+    }).then(function () {
+      if (isTrackerPage()) { renderHeader(); renderMap(); }
+      else scheduleHook();
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function accountLabel() { return fbUser ? 'Sign out' : 'Sign in'; }
+
+  function updateAccountButtons() {
+    var nodes = document.querySelectorAll('.reader-account-btn');
+    Array.prototype.forEach.call(nodes, function (btn) {
+      btn.textContent = accountLabel();
+      btn.setAttribute('aria-expanded', btn.getAttribute('aria-expanded') || 'false');
+    });
+    if (fbUser) closeSignInPanel();
+  }
+
+  function showAuthMessage(text) {
+    var msg = document.querySelector('#reader-sign-in .reader-sign-msg');
+    if (msg) msg.textContent = text || '';
+  }
+
+  function closeSignInPanel() {
+    var panel = document.getElementById('reader-sign-in');
+    if (panel) panel.remove();
+    Array.prototype.forEach.call(document.querySelectorAll('.reader-account-btn'), function (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function openSignInPanel() {
+    if (document.getElementById('reader-sign-in')) return;
+    var panel = document.createElement('div');
+    panel.id = 'reader-sign-in';
+    panel.className = 'reader-sign-in';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'reader-sign-in-title');
+    panel.innerHTML =
+      '<h2 id="reader-sign-in-title">Sign in</h2>' +
+      '<button type="button" class="reader-sign-google">Sign in with Google</button>' +
+      '<p class="muted">Or use your email</p>' +
+      '<label for="reader-sign-email">Email</label>' +
+      '<input id="reader-sign-email" type="email" autocomplete="email" inputmode="email">' +
+      '<label for="reader-sign-password">Password</label>' +
+      '<input id="reader-sign-password" type="password" autocomplete="current-password">' +
+      '<div class="reader-sign-row">' +
+        '<button type="button" class="reader-sign-email-in">Sign in</button>' +
+        '<button type="button" class="reader-sign-create">Create account</button>' +
+      '</div>' +
+      '<button type="button" class="reader-sign-link">Send a sign-in link</button>' +
+      '<p class="reader-sign-msg" aria-live="polite"></p>' +
+      '<button type="button" class="reader-sign-close">Close</button>';
+    document.body.appendChild(panel);
+    if (lastAuthError) showAuthMessage(lastAuthError);
+    panel.querySelector('.reader-sign-google').addEventListener('click', function () { doGoogle(); });
+    panel.querySelector('.reader-sign-email-in').addEventListener('click', function () { doEmailPassword(false); });
+    panel.querySelector('.reader-sign-create').addEventListener('click', function () { doEmailPassword(true); });
+    panel.querySelector('.reader-sign-link').addEventListener('click', function () { doEmailLink(); });
+    panel.querySelector('.reader-sign-close').addEventListener('click', closeSignInPanel);
+    var email = panel.querySelector('#reader-sign-email');
+    if (email) email.focus();
+  }
+
+  function emailFields() {
+    var panel = document.getElementById('reader-sign-in');
+    return {
+      email: ((panel && panel.querySelector('#reader-sign-email').value) || '').trim(),
+      password: (panel && panel.querySelector('#reader-sign-password').value) || ''
+    };
+  }
+
+  function doGoogle() {
+    showAuthMessage('Opening Google…');
+    loadFirebase().then(function () {
+      if (!fbAuth) throw new Error('CONFIGURATION_NOT_FOUND');
+      var authMod = loadFirebase.authMod;
+      var provider = new authMod.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      if (preferRedirect()) return authMod.signInWithRedirect(fbAuth, provider);
+      return authMod.signInWithPopup(fbAuth, provider).catch(function (err) {
+        if (/popup/i.test(err && err.code || '')) return authMod.signInWithRedirect(fbAuth, provider);
+        throw err;
+      });
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function doEmailPassword(create) {
+    var f = emailFields();
+    if (!f.email) { showAuthMessage('Please type your email address.'); return; }
+    if (!f.password) { showAuthMessage('Please type a password, or send a sign-in link instead.'); return; }
+    showAuthMessage(create ? 'Creating account…' : 'Signing in…');
+    loadFirebase().then(function () {
+      if (!fbAuth) throw new Error('CONFIGURATION_NOT_FOUND');
+      var authMod = loadFirebase.authMod;
+      return create ? authMod.createUserWithEmailAndPassword(fbAuth, f.email, f.password)
+                    : authMod.signInWithEmailAndPassword(fbAuth, f.email, f.password);
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function doEmailLink() {
+    var f = emailFields();
+    if (!f.email) { showAuthMessage('Please type your email address.'); return; }
+    showAuthMessage('Sending link…');
+    loadFirebase().then(function () {
+      if (!fbAuth) throw new Error('CONFIGURATION_NOT_FOUND');
+      var authMod = loadFirebase.authMod;
+      var settings = {
+        url: location.origin + TRACKER_URL,
+        handleCodeInApp: true
+      };
+      return authMod.sendSignInLinkToEmail(fbAuth, f.email, settings).then(function () {
+        try { localStorage.setItem(EMAIL_LINK_KEY, f.email); } catch (e) {}
+        showAuthMessage('A sign-in link has been sent to ' + f.email + '. Open it on this device.');
+      });
+    }).catch(function (err) {
+      lastAuthError = authMessage(err);
+      showAuthMessage(lastAuthError);
+    });
+  }
+
+  function onAccountClick() {
+    if (fbUser) {
+      loadFirebase().then(function () { return loadFirebase.authMod.signOut(fbAuth); })
+        .catch(function (err) { lastAuthError = authMessage(err); showAuthMessage(lastAuthError); });
+      return;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.reader-account-btn'), function (btn) {
+      btn.setAttribute('aria-expanded', 'true');
+    });
+    openSignInPanel();
+    loadFirebase();
+  }
+
+  function ensureAccountButton(host) {
+    var btn = host.querySelector('.reader-account-btn');
+    if (btn) {
+      btn.textContent = accountLabel();
+      return btn;
+    }
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'reader-account-btn';
+    btn.textContent = accountLabel();
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onAccountClick();
+    });
+    host.appendChild(btn);
+    return btn;
+  }
+
   /* ---- reader hook: Tracker tab + Mark as read? Yes / No ---- */
   var hookScheduled = false;
   function scheduleHook() {
@@ -248,7 +556,15 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     var header = document.querySelector('.app-header');
     if (!header) return;
 
-    var tab = header.querySelector('.reader-tracker-tab');
+    var tools = header.querySelector('.reader-header-tools');
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.className = 'reader-header-tools';
+      header.appendChild(tools);
+    }
+    ensureAccountButton(tools);
+    var tab = tools.querySelector('.reader-tracker-tab') || header.querySelector('.reader-tracker-tab');
+    if (tab && tab.parentNode !== tools) tools.appendChild(tab);
     if (!tab) {
       tab = document.createElement('a');
       tab.className = 'reader-tracker-tab';
@@ -259,7 +575,7 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
         e.stopImmediatePropagation();
         window.location.assign(TRACKER_URL);
       }, true);
-      header.appendChild(tab);
+      tools.appendChild(tab);
     }
 
     var loc = chapterLocation();
@@ -333,12 +649,20 @@ var COUNTS = [["Genesis",[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,
     }
   });
 
+  function startAuth() { loadFirebase(); }
+
   if (isTrackerPage()) {
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initMap);
-    else initMap();
+    function bootTracker() {
+      var row = document.querySelector('header.top .row');
+      if (row) ensureAccountButton(row);
+      initMap();
+      startAuth();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootTracker);
+    else bootTracker();
   } else if (readerParts().length || location.pathname.indexOf('/reader') !== -1) {
     hookHistory();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleHook);
-    else scheduleHook();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { scheduleHook(); startAuth(); });
+    else { scheduleHook(); startAuth(); }
   }
 })();

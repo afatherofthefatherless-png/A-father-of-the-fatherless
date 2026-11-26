@@ -44,15 +44,40 @@
     focusBi = 0;
   }
 
-  function saveState() {
-    var payload = {
+  function buildPayload() {
+    return {
       app: 'tracker-mockup-d',
       v: 1,
       chapters: Object.keys(read),
       open: Object.keys(openSet).map(Number).filter(function (bi) { return openSet[bi]; }),
-      focus: focusBi
+      focus: focusBi,
+      saved: new Date().toISOString()
     };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
+  }
+
+  function writeLocal(payload) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload || buildPayload())); } catch (e) {}
+  }
+
+  function saveState() {
+    var payload = buildPayload();
+    writeLocal(payload);
+    if (window.TrackerTestAuth && typeof window.TrackerTestAuth.scheduleCloudSave === 'function') {
+      window.TrackerTestAuth.scheduleCloudSave(payload);
+    }
+  }
+
+  function applyRemoteChapters(list) {
+    (list || []).forEach(function (k) { if (typeof k === 'string') read[k] = 1; });
+  }
+
+  function refreshView() {
+    var y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+    if (window.TrackerTestAuth && typeof window.TrackerTestAuth.updateAccountButtons === 'function') {
+      window.TrackerTestAuth.updateAccountButtons();
+    }
   }
 
   function bookStats(bi) {
@@ -144,10 +169,10 @@
       '<header class="top"><div class="wrap">' +
         '<div class="row">' +
           '<h1 class="grow">Reading Tracker</h1>' +
-          '<a class="btnlink" href="#">Back to reader</a>' +
-          '<button type="button" class="btnlink">Sign in</button>' +
+          '<a class="btnlink" href="../reader/">Back to reader</a>' +
+          '<button type="button" class="btnlink reader-account-btn" aria-expanded="false">Sign in</button>' +
         '</div>' +
-        '<p class="mock-tag">Mockup D — try it on this page. Progress stays on this device and does not change the live tracker.</p>' +
+        '<p class="mock-tag">Tracker test — try it on this page. Progress is saved apart from the live tracker, on this device and, if you sign in, in a separate test copy in the cloud.</p>' +
         '<div class="prog">' +
           '<span id="progText"></span>' +
           '<span id="progPct"></span>' +
@@ -267,4 +292,12 @@
   loadState();
   render();
   document.getElementById('app').addEventListener('click', onClick);
+
+  window.TrackerTest = {
+    STORAGE_KEY: STORAGE_KEY,
+    buildPayload: buildPayload,
+    writeLocal: writeLocal,
+    applyRemoteChapters: applyRemoteChapters,
+    refreshView: refreshView
+  };
 })();

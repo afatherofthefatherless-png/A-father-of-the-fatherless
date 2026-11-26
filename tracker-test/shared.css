@@ -290,3 +290,31 @@ main.wrap h2{margin-top:8px}
   .d-head .pbar{grid-column:1;grid-row:3}
   .example-banner,.help{font-size:.85em}
 }
+
+/* Sign-in panel (same idea as the live tracker, used only on this test page) */
+.reader-account-btn{cursor:pointer}
+.reader-sign-in{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;
+  width:calc(100% - 24px);max-width:420px;max-height:calc(100dvh - 24px);
+  overflow:auto;background:var(--bg);color:var(--text);
+  border:var(--stroke) solid var(--text);border-radius:var(--radius);
+  padding:16px;box-sizing:border-box;
+}
+.reader-sign-in h2{margin:0 0 12px;font-size:1.15em}
+.reader-sign-in label{display:block;margin:10px 0 4px}
+.reader-sign-in input{
+  width:100%;min-height:var(--header-tap);
+  border:var(--stroke) solid var(--text);background:var(--panel);color:var(--text);
+  font:inherit;border-radius:var(--radius);padding:0 12px;box-sizing:border-box;
+}
+.reader-sign-in button{
+  width:100%;margin:6px 0 0;
+  min-height:var(--header-tap);min-width:var(--header-tap);
+}
+.reader-sign-in .reader-sign-row{display:flex;gap:8px}
+.reader-sign-in .reader-sign-row button{flex:1}
+.reader-sign-in .reader-sign-msg{min-height:1.4em;margin:10px 0 0}
+.reader-sign-in .muted{color:var(--muted);margin:12px 0 0}
+@media (max-width:620px){
+  .reader-sign-in{max-width:100%;width:calc(100% - 16px)}
+}

@@ -61,7 +61,14 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    // Drop shell files left in this cache by earlier builds, so an old copy is never served.
+    const cache = await caches.open(CACHE_NAME);
+    const current = new Set(SHELL.map((entry) => versionedRequest(entry).url));
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((request) => new URL(request.url).searchParams.has('__armorer_revision') && !current.has(request.url)).map((request) => cache.delete(request)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('message', (event) => {
